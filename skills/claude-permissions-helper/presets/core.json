@@ -89,7 +89,9 @@
       "Bash(yq *)",
       "Bash(lsof *)",
       "Bash(time *)",
-      "Bash(pgrep *)"
+      "Bash(pgrep *)",
+      "Bash(command *)",
+      "Bash(xargs *)"
     ]
   }
 }
