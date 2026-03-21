@@ -1,0 +1,25 @@
+{
+  "name": "hangyu-claude-marketplace",
+  "owner": {
+    "name": "Hangyu Lin",
+    "email": "hangyu.lin@deliveroo.co.uk"
+  },
+  "metadata": {
+    "description": "Personal Claude Code plugin marketplace for testing plugin setups",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "hello-world",
+      "source": "./skills/hello-world",
+      "description": "A minimal test plugin to verify marketplace installation and skill loading.",
+      "version": "1.0.0"
+    },
+    {
+      "name": "menus",
+      "source": "./teams/menus",
+      "description": "Skills for the Menus team",
+      "version": "1.0.0"
+    }
+  ]
+}
