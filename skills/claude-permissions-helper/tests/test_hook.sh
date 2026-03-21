@@ -1435,6 +1435,57 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+echo "=== SECURITY: env flag bypass ==="
+
+ENV_ALLOW='["Bash(env *)", "Bash(bash *)", "Bash(sh *)", "Bash(rm *)", "Bash(git *)"]'
+ENV_DENY='["Bash(rm -rf /)", "Bash(rm -rf ~)", "Bash(chmod 777)"]'
+
+# env -i clears environment — should still deny inner dangerous command
+run_hook "env -i bash -c 'rm -rf /'" "$ENV_ALLOW" "$ENV_DENY"
+rc=$?
+if [[ $rc -eq 2 ]] || jq -e '.hookSpecificOutput.permissionDecision == "deny"' <<< "$RESULT" &>/dev/null; then
+  pass "SECURITY: env -i bash -c 'rm -rf /' → denied (flag stripped)"
+else
+  fail "SECURITY: env -i bash -c 'rm -rf /' → BYPASS (env -i not stripped)" "exit=$rc decision=$(jq -r '.hookSpecificOutput.permissionDecision // "fallthrough"' <<< "$RESULT")"
+fi
+
+# env -u VAR unsets a variable — should still deny
+run_hook "env -u PATH rm -rf /" "$ENV_ALLOW" "$ENV_DENY"
+rc=$?
+if [[ $rc -eq 2 ]] || jq -e '.hookSpecificOutput.permissionDecision == "deny"' <<< "$RESULT" &>/dev/null; then
+  pass "SECURITY: env -u PATH rm -rf / → denied (flag+arg stripped)"
+else
+  fail "SECURITY: env -u PATH rm -rf / → BYPASS (env -u not stripped)" "exit=$rc decision=$(jq -r '.hookSpecificOutput.permissionDecision // "fallthrough"' <<< "$RESULT")"
+fi
+
+# env -- ends options — should still deny
+run_hook "env -- rm -rf /" "$ENV_ALLOW" "$ENV_DENY"
+rc=$?
+if [[ $rc -eq 2 ]] || jq -e '.hookSpecificOutput.permissionDecision == "deny"' <<< "$RESULT" &>/dev/null; then
+  pass "SECURITY: env -- rm -rf / → denied (-- stripped)"
+else
+  fail "SECURITY: env -- rm -rf / → BYPASS (env -- not stripped)" "exit=$rc decision=$(jq -r '.hookSpecificOutput.permissionDecision // "fallthrough"' <<< "$RESULT")"
+fi
+
+# env -i with VAR=val then dangerous command
+run_hook "env -i FOO=bar rm -rf /" "$ENV_ALLOW" "$ENV_DENY"
+rc=$?
+if [[ $rc -eq 2 ]] || jq -e '.hookSpecificOutput.permissionDecision == "deny"' <<< "$RESULT" &>/dev/null; then
+  pass "SECURITY: env -i FOO=bar rm -rf / → denied (flag+var stripped)"
+else
+  fail "SECURITY: env -i FOO=bar rm -rf / → BYPASS" "exit=$rc decision=$(jq -r '.hookSpecificOutput.permissionDecision // "fallthrough"' <<< "$RESULT")"
+fi
+
+# env -i with safe command should still allow
+run_hook "env -i PATH=/usr/bin git status" "$ENV_ALLOW" "$ENV_DENY"
+rc=$?
+if [[ $rc -eq 0 ]] && jq -e '.hookSpecificOutput.permissionDecision == "allow"' <<< "$RESULT" &>/dev/null; then
+  pass "env -i PATH=/usr/bin git status → allowed (safe command)"
+else
+  fail "env -i PATH=/usr/bin git status → should allow" "exit=$rc decision=$(jq -r '.hookSpecificOutput.permissionDecision // "fallthrough"' <<< "$RESULT")"
+fi
+
+# ---------------------------------------------------------------------------
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [[ $FAIL -eq 0 ]] && exit 0 || exit 1
