@@ -1,0 +1,20 @@
+{
+  "name": "mcp-slack",
+  "description": "Slack MCP tools — channels, messages, threads, search, users, canvases (read-only by default)",
+  "permissions": {
+    "allow": [
+      "mcp__slack__slack_list_channels",
+      "mcp__slack__slack_get_channel_history",
+      "mcp__slack__slack_get_thread_replies",
+      "mcp__slack__slack_get_users",
+      "mcp__slack__slack_get_user_profile",
+      "mcp__plugin_slack_slack__slack_read_channel",
+      "mcp__plugin_slack_slack__slack_read_thread",
+      "mcp__plugin_slack_slack__slack_read_canvas",
+      "mcp__plugin_slack_slack__slack_read_user_profile",
+      "mcp__plugin_slack_slack__slack_search_public",
+      "mcp__plugin_slack_slack__slack_search_channels",
+      "mcp__plugin_slack_slack__slack_search_users"
+    ]
+  }
+}

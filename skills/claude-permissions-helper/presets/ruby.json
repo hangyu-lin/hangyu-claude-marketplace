@@ -1,0 +1,15 @@
+{
+  "name": "ruby",
+  "description": "Ruby ecosystem — ruby, bundle, gem, rake, rails, rspec, rubocop",
+  "permissions": {
+    "allow": [
+      "Bash(ruby *)",
+      "Bash(bundle *)",
+      "Bash(gem *)",
+      "Bash(rake *)",
+      "Bash(rails *)",
+      "Bash(rspec *)",
+      "Bash(rubocop *)"
+    ]
+  }
+}

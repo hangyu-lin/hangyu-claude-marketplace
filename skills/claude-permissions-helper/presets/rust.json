@@ -1,0 +1,13 @@
+{
+  "name": "rust",
+  "description": "Rust toolchain — cargo, rustc, rustup, clippy, rustfmt",
+  "permissions": {
+    "allow": [
+      "Bash(cargo *)",
+      "Bash(rustc *)",
+      "Bash(rustup *)",
+      "Bash(clippy *)",
+      "Bash(rustfmt *)"
+    ]
+  }
+}

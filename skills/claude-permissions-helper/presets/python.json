@@ -1,0 +1,23 @@
+{
+  "name": "python",
+  "description": "Python ecosystem — python, pip, poetry, uv, pytest, linters, formatters",
+  "permissions": {
+    "allow": [
+      "Bash(python *)",
+      "Bash(python3 *)",
+      "Bash(pip *)",
+      "Bash(pip3 *)",
+      "Bash(poetry *)",
+      "Bash(uv *)",
+      "Bash(pytest *)",
+      "Bash(black *)",
+      "Bash(ruff *)",
+      "Bash(mypy *)",
+      "Bash(pylint *)",
+      "Bash(flake8 *)",
+      "Bash(isort *)",
+      "Bash(coverage *)",
+      "Bash(pydoc *)"
+    ]
+  }
+}

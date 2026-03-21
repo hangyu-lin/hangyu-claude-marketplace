@@ -1,0 +1,9 @@
+{
+  "name": "gws",
+  "description": "Google Workspace CLI — Gmail, Drive, Calendar, Sheets, Docs, Admin APIs",
+  "permissions": {
+    "allow": [
+      "Bash(gws *)"
+    ]
+  }
+}

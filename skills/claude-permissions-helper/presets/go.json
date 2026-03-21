@@ -1,0 +1,12 @@
+{
+  "name": "go",
+  "description": "Go toolchain — go, golangci-lint, goimports, gofmt",
+  "permissions": {
+    "allow": [
+      "Bash(go *)",
+      "Bash(golangci-lint *)",
+      "Bash(goimports *)",
+      "Bash(gofmt *)"
+    ]
+  }
+}

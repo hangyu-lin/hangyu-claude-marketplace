@@ -1,0 +1,12 @@
+{
+  "name": "mcp-glean",
+  "description": "Glean MCP tools — search, chat, read documents, employee search",
+  "permissions": {
+    "allow": [
+      "mcp__glean_default__search",
+      "mcp__glean_default__chat",
+      "mcp__glean_default__read_document",
+      "mcp__glean_default__employee_search"
+    ]
+  }
+}

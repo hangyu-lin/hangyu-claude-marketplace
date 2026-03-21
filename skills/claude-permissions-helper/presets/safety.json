@@ -1,0 +1,19 @@
+{
+  "name": "safety",
+  "description": "Deny dangerous commands — rm -rf /, chmod 777, dd, mkfs, force-push to main/master, git reset --hard",
+  "permissions": {
+    "deny": [
+      "Bash(rm -rf /)",
+      "Bash(rm -rf ~)",
+      "Bash(chmod 777)",
+      "Bash(chmod -R 777)",
+      "Bash(mkfs *)",
+      "Bash(dd *)",
+      "Bash(git push --force origin main)",
+      "Bash(git push --force origin master)",
+      "Bash(git push -f origin main)",
+      "Bash(git push -f origin master)",
+      "Bash(git reset --hard)"
+    ]
+  }
+}

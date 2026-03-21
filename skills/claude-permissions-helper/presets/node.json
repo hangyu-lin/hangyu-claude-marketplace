@@ -1,0 +1,16 @@
+{
+  "name": "node",
+  "description": "Node.js ecosystem — npm, yarn, pnpm, bun, node, deno, test runners",
+  "permissions": {
+    "allow": [
+      "Bash(npm *)",
+      "Bash(yarn *)",
+      "Bash(pnpm *)",
+      "Bash(bun *)",
+      "Bash(node *)",
+      "Bash(deno *)",
+      "Bash(jest *)",
+      "Bash(vitest *)"
+    ]
+  }
+}

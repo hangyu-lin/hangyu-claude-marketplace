@@ -1,0 +1,23 @@
+{
+  "name": "claude-permissions-helper",
+  "version": "1.0.0",
+  "description": "Auto-approve compound Bash commands and manage permission presets. Parses pipes, chains, and subshells via shfmt AST to approve compound commands when all sub-commands are individually allowed.",
+  "author": {
+    "name": "Hangyu Lin",
+    "email": "hangyu.lin@deliveroo.co.uk"
+  },
+  "homepage": "https://github.com/deliveroo/deliveroo-claude-marketplace",
+  "repository": "https://github.com/deliveroo/deliveroo-claude-marketplace.git",
+  "keywords": [
+    "permissions",
+    "auto-approve",
+    "bash",
+    "hooks",
+    "productivity",
+    "compound-commands",
+    "deliveroo"
+  ],
+  "skills": ["./skills/"],
+  "commands": ["./commands/"],
+  "hooks": "./hooks/hooks.json"
+}

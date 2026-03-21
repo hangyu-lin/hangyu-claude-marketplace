@@ -1,0 +1,9 @@
+{
+  "name": "github-cli",
+  "description": "GitHub CLI — PRs, issues, API, search, auth, actions, and more",
+  "permissions": {
+    "allow": [
+      "Bash(gh *)"
+    ]
+  }
+}

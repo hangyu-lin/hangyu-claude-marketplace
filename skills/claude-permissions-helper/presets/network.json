@@ -1,0 +1,13 @@
+{
+  "name": "network",
+  "description": "Network tools — curl, wget, ssh, scp, rsync (can access remote hosts and transfer data)",
+  "permissions": {
+    "allow": [
+      "Bash(curl *)",
+      "Bash(wget *)",
+      "Bash(ssh *)",
+      "Bash(scp *)",
+      "Bash(rsync *)"
+    ]
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "name": "readonly-tools",
+  "description": "Read-only Claude Code tools — Read, Glob, Grep, WebSearch, WebFetch, MCP resource tools",
+  "permissions": {
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "WebSearch",
+      "WebFetch",
+      "ListMcpResourcesTool",
+      "ReadMcpResourceTool"
+    ]
+  }
+}

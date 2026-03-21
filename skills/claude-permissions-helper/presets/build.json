@@ -1,0 +1,12 @@
+{
+  "name": "build",
+  "description": "Build tools — make, cmake, gradle, mvn (runs arbitrary build targets)",
+  "permissions": {
+    "allow": [
+      "Bash(make *)",
+      "Bash(cmake *)",
+      "Bash(gradle *)",
+      "Bash(mvn *)"
+    ]
+  }
+}
