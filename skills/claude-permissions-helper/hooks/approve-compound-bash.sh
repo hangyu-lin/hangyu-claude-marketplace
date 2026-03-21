@@ -263,6 +263,13 @@ strip_prefixes() {
   out_ref=("$full_command")
   [[ "$stripped" != "$full_command" ]] && out_ref+=("$stripped")
 
+  # Phase 1b: Normalize absolute path to basename (e.g. /opt/homebrew/bin/bash → bash)
+  if [[ "$stripped" =~ ^(/[^[:space:]]+/)([^[:space:]/]+)(.*) ]]; then
+    local basename_cmd="${BASH_REMATCH[2]}${BASH_REMATCH[3]}"
+    [[ -n "$basename_cmd" ]] && out_ref+=("$basename_cmd")
+    stripped="$basename_cmd"
+  fi
+
   # Phase 2: Strip "env" launcher prefix
   local env_stripped="$stripped"
   if [[ "$env_stripped" =~ ^env[[:space:]]+(.*) ]]; then

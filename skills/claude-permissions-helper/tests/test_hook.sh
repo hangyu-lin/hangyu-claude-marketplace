@@ -1396,6 +1396,45 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+echo "=== Absolute path normalization ==="
+
+# /opt/homebrew/bin/bash should match Bash(bash *)
+run_hook "/opt/homebrew/bin/bash tests/test_hook.sh" '["Bash(bash *)"]'
+rc=$?
+if [[ $rc -eq 0 ]] && jq -e '.hookSpecificOutput.permissionDecision == "allow"' <<< "$RESULT" &>/dev/null; then
+  pass "abspath: /opt/homebrew/bin/bash matches Bash(bash *)"
+else
+  fail "abspath: /opt/homebrew/bin/bash matches Bash(bash *)" "exit=$rc decision=$(jq -r '.hookSpecificOutput.permissionDecision // "fallthrough"' <<< "$RESULT")"
+fi
+
+# /usr/bin/git should match Bash(git *)
+run_hook "/usr/bin/git status" '["Bash(git *)"]'
+rc=$?
+if [[ $rc -eq 0 ]] && jq -e '.hookSpecificOutput.permissionDecision == "allow"' <<< "$RESULT" &>/dev/null; then
+  pass "abspath: /usr/bin/git status matches Bash(git *)"
+else
+  fail "abspath: /usr/bin/git status matches Bash(git *)" "exit=$rc decision=$(jq -r '.hookSpecificOutput.permissionDecision // "fallthrough"' <<< "$RESULT")"
+fi
+
+# Absolute path to denied command should still be denied
+run_hook "/bin/rm -rf /" '["Bash(rm *)"]' '["Bash(rm -rf /)"]'
+rc=$?
+if [[ $rc -eq 2 ]] || jq -e '.hookSpecificOutput.permissionDecision == "deny"' <<< "$RESULT" &>/dev/null; then
+  pass "abspath deny: /bin/rm -rf / → correctly denied"
+else
+  fail "abspath deny: /bin/rm -rf / → should be denied" "exit=$rc decision=$(jq -r '.hookSpecificOutput.permissionDecision // "fallthrough"' <<< "$RESULT")"
+fi
+
+# Absolute path bash -c should still recursively check inner command
+run_hook "/opt/homebrew/bin/bash -c 'rm -rf /'" '["Bash(bash *)"]' '["Bash(rm -rf /)"]'
+rc=$?
+if [[ $rc -eq 2 ]] || jq -e '.hookSpecificOutput.permissionDecision == "deny"' <<< "$RESULT" &>/dev/null; then
+  pass "abspath deny: /opt/.../bash -c 'rm -rf /' → inner command denied"
+else
+  fail "abspath deny: /opt/.../bash -c 'rm -rf /' → should deny inner command" "exit=$rc decision=$(jq -r '.hookSpecificOutput.permissionDecision // "fallthrough"' <<< "$RESULT")"
+fi
+
+# ---------------------------------------------------------------------------
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [[ $FAIL -eq 0 ]] && exit 0 || exit 1

@@ -91,7 +91,10 @@
       "Bash(time *)",
       "Bash(pgrep *)",
       "Bash(command *)",
-      "Bash(xargs *)"
+      "Bash(xargs *)",
+      "Bash(env *)",
+      "Bash(bash *)",
+      "Bash(sh *)"
     ]
   }
 }
