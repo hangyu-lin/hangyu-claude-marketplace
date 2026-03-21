@@ -206,19 +206,29 @@ parse_compound() {
     return 1
   fi
 
-  local entry inner
+  local entry inner stripped_entry
   while IFS= read -r -d '' entry; do
     [[ -z "$entry" ]] && continue
+    # Strip simple prefix launchers (command, time, nohup, builtin) and their
+    # flags before checking for shell -c or eval/exec patterns, so that
+    # "command sh -c 'rm -rf /'" is recursively expanded.
+    stripped_entry="$entry"
+    while [[ "$stripped_entry" =~ ^(time|nohup|command|builtin)[[:space:]]+(.+)$ ]]; do
+      stripped_entry="${BASH_REMATCH[2]}"
+      while [[ "$stripped_entry" =~ ^-[a-zA-Z][[:space:]]+(.+)$ ]]; do
+        stripped_entry="${BASH_REMATCH[1]}"
+      done
+    done
     # Recursively expand shell -c (bash, sh, zsh, dash, ksh with combined flags)
-    if [[ "$entry" =~ ^(env[[:space:]]+)?(/[^[:space:]]*/)?((ba|da|k|z)?sh)[[:space:]]+-[a-z]*c[[:space:]]*\'(.*)\'$ ]] ||
-       [[ "$entry" =~ ^(env[[:space:]]+)?(/[^[:space:]]*/)?((ba|da|k|z)?sh)[[:space:]]+-[a-z]*c[[:space:]]*\"(.*)\"$ ]] ||
-       [[ "$entry" =~ ^(env[[:space:]]+)?(/[^[:space:]]*/)?((ba|da|k|z)?sh)[[:space:]]+-[a-z]*c[[:space:]]+(.+)$ ]]; then
+    if [[ "$stripped_entry" =~ ^(env[[:space:]]+)?(/[^[:space:]]*/)?((ba|da|k|z)?sh)[[:space:]]+-[a-z]*c[[:space:]]*\'(.*)\'$ ]] ||
+       [[ "$stripped_entry" =~ ^(env[[:space:]]+)?(/[^[:space:]]*/)?((ba|da|k|z)?sh)[[:space:]]+-[a-z]*c[[:space:]]*\"(.*)\"$ ]] ||
+       [[ "$stripped_entry" =~ ^(env[[:space:]]+)?(/[^[:space:]]*/)?((ba|da|k|z)?sh)[[:space:]]+-[a-z]*c[[:space:]]+(.+)$ ]]; then
       debug "Recursing into shell -c: ${BASH_REMATCH[5]}"
       if ! parse_compound "${BASH_REMATCH[5]}"; then
         printf '%s\0' "$entry"
       fi
     # Recursively expand eval / exec
-    elif [[ "$entry" =~ ^(eval|exec)[[:space:]]+(.+)$ ]]; then
+    elif [[ "$stripped_entry" =~ ^(eval|exec)[[:space:]]+(.+)$ ]]; then
       inner="${BASH_REMATCH[2]}"
       if [[ "$inner" =~ ^\'(.*)\'$ ]] || [[ "$inner" =~ ^\"(.*)\"$ ]]; then
         inner="${BASH_REMATCH[1]}"
@@ -305,33 +315,40 @@ strip_prefixes() {
     fi
   fi
 
-  # Final pass: extract inner commands from any candidate that is itself a launcher
-  local -a extra=()
-  local cand inner_cmd
-  for cand in "${out_ref[@]}"; do
-    if [[ "$cand" =~ ^(/[^[:space:]]*/)?((ba|da|k|z)?sh)[[:space:]]+-[a-z]*c[[:space:]]+(.+)$ ]]; then
-      inner_cmd="${BASH_REMATCH[4]}"
-      if [[ "$inner_cmd" =~ ^\'(.*)\'$ ]] || [[ "$inner_cmd" =~ ^\"(.*)\"$ ]]; then
-        inner_cmd="${BASH_REMATCH[1]}"
+  # Final pass: iteratively extract inner commands from launchers until stable.
+  # Each iteration processes only newly added candidates to avoid re-checking.
+  # Depth-limited to 10 to prevent infinite loops from pathological input.
+  local -a pending=("${out_ref[@]}")
+  local cand inner_cmd depth=0
+  while (( ${#pending[@]} > 0 && depth < 10 )); do
+    local -a extra=()
+    for cand in "${pending[@]}"; do
+      if [[ "$cand" =~ ^(/[^[:space:]]*/)?((ba|da|k|z)?sh)[[:space:]]+-[a-z]*c[[:space:]]+(.+)$ ]]; then
+        inner_cmd="${BASH_REMATCH[4]}"
+        if [[ "$inner_cmd" =~ ^\'(.*)\'$ ]] || [[ "$inner_cmd" =~ ^\"(.*)\"$ ]]; then
+          inner_cmd="${BASH_REMATCH[1]}"
+        fi
+        [[ -n "$inner_cmd" ]] && extra+=("$inner_cmd")
+      elif [[ "$cand" =~ ^(eval|exec)[[:space:]]+(.+)$ ]]; then
+        inner_cmd="${BASH_REMATCH[2]}"
+        if [[ "$inner_cmd" =~ ^\'(.*)\'$ ]] || [[ "$inner_cmd" =~ ^\"(.*)\"$ ]]; then
+          inner_cmd="${BASH_REMATCH[1]}"
+        fi
+        [[ -n "$inner_cmd" ]] && extra+=("$inner_cmd")
+      # Simple prefix launchers: time, nohup, command, builtin
+      elif [[ "$cand" =~ ^(time|nohup|command|builtin)[[:space:]]+(.+)$ ]]; then
+        inner_cmd="${BASH_REMATCH[2]}"
+        # Skip optional single-letter flags (e.g. time -p, command -p)
+        while [[ "$inner_cmd" =~ ^-[a-zA-Z][[:space:]]+(.+)$ ]]; do
+          inner_cmd="${BASH_REMATCH[1]}"
+        done
+        [[ -n "$inner_cmd" ]] && extra+=("$inner_cmd")
       fi
-      [[ -n "$inner_cmd" ]] && extra+=("$inner_cmd")
-    elif [[ "$cand" =~ ^(eval|exec)[[:space:]]+(.+)$ ]]; then
-      inner_cmd="${BASH_REMATCH[2]}"
-      if [[ "$inner_cmd" =~ ^\'(.*)\'$ ]] || [[ "$inner_cmd" =~ ^\"(.*)\"$ ]]; then
-        inner_cmd="${BASH_REMATCH[1]}"
-      fi
-      [[ -n "$inner_cmd" ]] && extra+=("$inner_cmd")
-    # Simple prefix launchers: time, nohup, command, builtin
-    elif [[ "$cand" =~ ^(time|nohup|command|builtin)[[:space:]]+(.+)$ ]]; then
-      inner_cmd="${BASH_REMATCH[2]}"
-      # Skip optional single-letter flags (e.g. time -p, command -p)
-      while [[ "$inner_cmd" =~ ^-[a-zA-Z][[:space:]]+(.+)$ ]]; do
-        inner_cmd="${BASH_REMATCH[1]}"
-      done
-      [[ -n "$inner_cmd" ]] && extra+=("$inner_cmd")
-    fi
+    done
+    (( ${#extra[@]} > 0 )) && out_ref+=("${extra[@]}")
+    pending=("${extra[@]}")
+    ((depth++))
   done
-  (( ${#extra[@]} > 0 )) && out_ref+=("${extra[@]}")
 }
 
 # Check if a command matches any prefix in the given list.

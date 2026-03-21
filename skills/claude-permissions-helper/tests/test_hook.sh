@@ -1218,6 +1218,184 @@ fi
 rm -rf "$TEMP_HOME" "$TEMP_HOME2"
 
 # ---------------------------------------------------------------------------
+echo "=== SECURITY: command * deny bypass via nested launchers ==="
+# Root cause: strip_prefixes final pass runs once — chaining two launchers
+# (command + sh -c, command + eval, etc.) means the innermost command is
+# never extracted for deny checking. The outer launcher matches allow *
+# before deny sees the dangerous inner command.
+
+BYPASS_ALLOW='["Bash(command *)", "Bash(rm *)", "Bash(echo *)", "Bash(sh *)"]'
+BYPASS_DENY='["Bash(rm -rf /)", "Bash(rm -rf ~)", "Bash(chmod 777)"]'
+
+# command sh -c wrapping — innermost rm -rf / should be caught by deny
+run_hook "command sh -c 'rm -rf /'" "$BYPASS_ALLOW" "$BYPASS_DENY"
+rc=$?
+if [[ $rc -eq 2 ]] || jq -e '.hookSpecificOutput.permissionDecision == "deny"' <<< "$RESULT" &>/dev/null; then
+  pass "SECURITY: command sh -c 'rm -rf /' → deny catches inner command"
+else
+  fail "SECURITY: command sh -c 'rm -rf /' → BYPASS (strip_prefixes single-pass)" "exit=$rc decision=$(jq -r '.hookSpecificOutput.permissionDecision // "fallthrough"' <<< "$RESULT")"
+fi
+
+# command -p sh -c wrapping — flag + nested launcher
+run_hook "command -p sh -c 'rm -rf /'" "$BYPASS_ALLOW" "$BYPASS_DENY"
+rc=$?
+if [[ $rc -eq 2 ]] || jq -e '.hookSpecificOutput.permissionDecision == "deny"' <<< "$RESULT" &>/dev/null; then
+  pass "SECURITY: command -p sh -c 'rm -rf /' → deny catches inner command"
+else
+  fail "SECURITY: command -p sh -c 'rm -rf /' → BYPASS (flag + nested launcher)" "exit=$rc decision=$(jq -r '.hookSpecificOutput.permissionDecision // "fallthrough"' <<< "$RESULT")"
+fi
+
+# command eval wrapping — eval should be recursively expanded
+run_hook "command eval 'rm -rf /'" '["Bash(command *)", "Bash(eval *)", "Bash(rm *)"]' "$BYPASS_DENY"
+rc=$?
+if [[ $rc -eq 2 ]] || jq -e '.hookSpecificOutput.permissionDecision == "deny"' <<< "$RESULT" &>/dev/null; then
+  pass "SECURITY: command eval 'rm -rf /' → deny catches inner command"
+else
+  fail "SECURITY: command eval 'rm -rf /' → BYPASS (command wraps eval)" "exit=$rc decision=$(jq -r '.hookSpecificOutput.permissionDecision // "fallthrough"' <<< "$RESULT")"
+fi
+
+# command command rm -rf / — double command prefix
+run_hook "command command rm -rf /" '["Bash(command *)"]' "$BYPASS_DENY"
+rc=$?
+if [[ $rc -eq 2 ]] || jq -e '.hookSpecificOutput.permissionDecision == "deny"' <<< "$RESULT" &>/dev/null; then
+  pass "SECURITY: command command rm -rf / → deny catches after double strip"
+else
+  fail "SECURITY: command command rm -rf / → BYPASS (double command prefix)" "exit=$rc decision=$(jq -r '.hookSpecificOutput.permissionDecision // "fallthrough"' <<< "$RESULT")"
+fi
+
+# nohup sh -c wrapping — same pattern with nohup
+run_hook "nohup sh -c 'rm -rf /'" '["Bash(nohup *)", "Bash(rm *)"]' "$BYPASS_DENY"
+rc=$?
+if [[ $rc -eq 2 ]] || jq -e '.hookSpecificOutput.permissionDecision == "deny"' <<< "$RESULT" &>/dev/null; then
+  pass "SECURITY: nohup sh -c 'rm -rf /' → deny catches inner command"
+else
+  fail "SECURITY: nohup sh -c 'rm -rf /' → BYPASS (nohup wraps sh -c)" "exit=$rc decision=$(jq -r '.hookSpecificOutput.permissionDecision // "fallthrough"' <<< "$RESULT")"
+fi
+
+# time sh -c wrapping — same pattern with time
+run_hook "time sh -c 'rm -rf /'" '["Bash(time *)", "Bash(rm *)"]' "$BYPASS_DENY"
+rc=$?
+if [[ $rc -eq 2 ]] || jq -e '.hookSpecificOutput.permissionDecision == "deny"' <<< "$RESULT" &>/dev/null; then
+  pass "SECURITY: time sh -c 'rm -rf /' → deny catches inner command"
+else
+  fail "SECURITY: time sh -c 'rm -rf /' → BYPASS (time wraps sh -c)" "exit=$rc decision=$(jq -r '.hookSpecificOutput.permissionDecision // "fallthrough"' <<< "$RESULT")"
+fi
+
+# Compound path: echo | command sh -c 'rm -rf /' (pipe forces compound parsing)
+run_hook "echo hello | command sh -c 'rm -rf /'" "$BYPASS_ALLOW" "$BYPASS_DENY"
+rc=$?
+if [[ $rc -eq 2 ]] || jq -e '.hookSpecificOutput.permissionDecision == "deny"' <<< "$RESULT" &>/dev/null; then
+  pass "SECURITY: echo | command sh -c 'rm -rf /' → deny catches in compound path"
+else
+  fail "SECURITY: echo | command sh -c 'rm -rf /' → BYPASS (compound path, same root cause)" "exit=$rc decision=$(jq -r '.hookSpecificOutput.permissionDecision // "fallthrough"' <<< "$RESULT")"
+fi
+
+# ---------------------------------------------------------------------------
+echo "=== SECURITY: xargs * edge cases ==="
+
+XARGS_ALLOW='["Bash(xargs *)", "Bash(cat *)", "Bash(find *)", "Bash(echo *)"]'
+XARGS_DENY='["Bash(rm -rf /)", "Bash(rm -rf ~)", "Bash(chmod 777)"]'
+
+# xargs with placeholder — inner command determined at runtime from stdin.
+# Hook cannot statically determine what {} expands to, so it should NOT
+# auto-approve — should fall through to user prompt.
+run_hook "xargs -I{} sh -c '{}'" '["Bash(xargs *)"]' "$XARGS_DENY"
+rc=$?
+if [[ $rc -eq 0 ]] && [[ -z "$RESULT" ]]; then
+  pass "SECURITY: xargs -I{} sh -c '{}' → fallthrough (can't statically check)"
+elif [[ $rc -eq 0 ]] && jq -e '.hookSpecificOutput.permissionDecision == "allow"' <<< "$RESULT" &>/dev/null; then
+  fail "SECURITY: xargs -I{} sh -c '{}' → RISKY AUTO-APPROVE (placeholder is opaque)" "exit=$rc"
+else
+  pass "SECURITY: xargs -I{} sh -c '{}' → not auto-approved"
+fi
+
+# xargs with placeholder -I {} (space-separated) — same risk
+run_hook "xargs -I {} sh -c '{}'" '["Bash(xargs *)"]' "$XARGS_DENY"
+rc=$?
+if [[ $rc -eq 0 ]] && jq -e '.hookSpecificOutput.permissionDecision == "allow"' <<< "$RESULT" &>/dev/null; then
+  fail "SECURITY: xargs -I {} sh -c '{}' → RISKY AUTO-APPROVE (space-separated placeholder)" "exit=$rc"
+else
+  pass "SECURITY: xargs -I {} sh -c '{}' → not auto-approved (correct)"
+fi
+
+# xargs with no explicit command — defaults to /bin/echo, safe.
+# But Bash(xargs *) still matches, so this auto-approves, which is fine.
+run_hook "xargs" '["Bash(xargs *)"]' "$XARGS_DENY"
+rc=$?
+if [[ $rc -eq 0 ]] && jq -e '.hookSpecificOutput.permissionDecision == "allow"' <<< "$RESULT" &>/dev/null; then
+  pass "SECURITY: bare 'xargs' → auto-approve OK (defaults to echo)"
+else
+  pass "SECURITY: bare 'xargs' → fallthrough (conservative, also OK)"
+fi
+
+# xargs piped with denied command: find / | xargs rm -rf /
+run_hook "find / | xargs rm -rf /" '["Bash(find *)", "Bash(xargs *)", "Bash(rm *)"]' "$XARGS_DENY"
+rc=$?
+if [[ $rc -eq 2 ]] || jq -e '.hookSpecificOutput.permissionDecision == "deny"' <<< "$RESULT" &>/dev/null; then
+  pass "SECURITY: find / | xargs rm -rf / → deny catches inner rm -rf /"
+else
+  fail "SECURITY: find / | xargs rm -rf / → missed deny through pipe+xargs" "exit=$rc decision=$(jq -r '.hookSpecificOutput.permissionDecision // "fallthrough"' <<< "$RESULT")"
+fi
+
+# xargs with shell -c wrapping (xargs handled by compound parse_compound,
+# not strip_prefixes, so sh -c IS recursively expanded)
+run_hook "xargs sh -c 'rm -rf /'" '["Bash(xargs *)", "Bash(sh *)", "Bash(rm *)"]' "$XARGS_DENY"
+rc=$?
+if [[ $rc -eq 2 ]] || jq -e '.hookSpecificOutput.permissionDecision == "deny"' <<< "$RESULT" &>/dev/null; then
+  pass "SECURITY: xargs sh -c 'rm -rf /' → deny catches via xargs launcher + sh -c expansion"
+else
+  fail "SECURITY: xargs sh -c 'rm -rf /' → BYPASS (xargs + sh -c)" "exit=$rc decision=$(jq -r '.hookSpecificOutput.permissionDecision // "fallthrough"' <<< "$RESULT")"
+fi
+
+# xargs with env var prefix hiding the real command
+run_hook "FOO=bar xargs rm -rf /" '["Bash(xargs *)", "Bash(rm *)"]' "$XARGS_DENY"
+rc=$?
+if [[ $rc -eq 2 ]] || jq -e '.hookSpecificOutput.permissionDecision == "deny"' <<< "$RESULT" &>/dev/null; then
+  pass "SECURITY: FOO=bar xargs rm -rf / → deny catches after env+xargs strip"
+else
+  fail "SECURITY: FOO=bar xargs rm -rf / → missed deny (env prefix + xargs)" "exit=$rc decision=$(jq -r '.hookSpecificOutput.permissionDecision // "fallthrough"' <<< "$RESULT")"
+fi
+
+# ---------------------------------------------------------------------------
+echo "=== SECURITY: command * edge cases (non-bypass) ==="
+
+# command -v is safe (just checks existence) — should auto-approve with command *
+run_hook "command -v rm" '["Bash(command *)"]' "$BYPASS_DENY"
+rc=$?
+if [[ $rc -eq 0 ]] && jq -e '.hookSpecificOutput.permissionDecision == "allow"' <<< "$RESULT" &>/dev/null; then
+  pass "command -v rm → auto-approve OK (command -v is read-only)"
+else
+  pass "command -v rm → fallthrough (conservative, also OK)"
+fi
+
+# command rm -rf / (single layer) — should be denied
+run_hook "command rm -rf /" '["Bash(command *)"]' "$BYPASS_DENY"
+rc=$?
+if [[ $rc -eq 2 ]] || jq -e '.hookSpecificOutput.permissionDecision == "deny"' <<< "$RESULT" &>/dev/null; then
+  pass "command rm -rf / (single layer) → correctly denied"
+else
+  fail "command rm -rf / (single layer) → should be denied" "exit=$rc decision=$(jq -r '.hookSpecificOutput.permissionDecision // "fallthrough"' <<< "$RESULT")"
+fi
+
+# command -p rm -rf / (single layer with flag) — should be denied
+run_hook "command -p rm -rf /" '["Bash(command *)"]' "$BYPASS_DENY"
+rc=$?
+if [[ $rc -eq 2 ]] || jq -e '.hookSpecificOutput.permissionDecision == "deny"' <<< "$RESULT" &>/dev/null; then
+  pass "command -p rm -rf / (single layer+flag) → correctly denied"
+else
+  fail "command -p rm -rf / (single layer+flag) → should be denied" "exit=$rc decision=$(jq -r '.hookSpecificOutput.permissionDecision // "fallthrough"' <<< "$RESULT")"
+fi
+
+# command without args — should auto-approve with command * (harmless)
+run_hook "command --help" '["Bash(command *)"]' "$BYPASS_DENY"
+rc=$?
+if [[ $rc -eq 0 ]] && jq -e '.hookSpecificOutput.permissionDecision == "allow"' <<< "$RESULT" &>/dev/null; then
+  pass "command --help → auto-approve OK (harmless)"
+else
+  pass "command --help → fallthrough (also OK)"
+fi
+
+# ---------------------------------------------------------------------------
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
 [[ $FAIL -eq 0 ]] && exit 0 || exit 1
