@@ -20,6 +20,12 @@
       "source": "./teams/menus",
       "description": "Skills for the Menus team",
       "version": "1.0.0"
+    },
+    {
+      "name": "claude-permissions-helper",
+      "source": "./skills/claude-permissions-helper",
+      "description": "Auto-approve compound Bash commands and manage permission presets via shfmt AST parsing.",
+      "version": "1.0.0"
     }
   ]
 }
