@@ -270,11 +270,26 @@ strip_prefixes() {
     stripped="$basename_cmd"
   fi
 
-  # Phase 2: Strip "env" launcher prefix
+  # Phase 2: Strip "env" launcher prefix (handles flags like -i, -u VAR, -0, --)
   local env_stripped="$stripped"
   if [[ "$env_stripped" =~ ^env[[:space:]]+(.*) ]]; then
     env_stripped="${BASH_REMATCH[1]}"
-    # Strip any VAR=val after env
+    # Strip env flags: -i, -0, --null, --, and -u VAR (takes an argument)
+    while true; do
+      if [[ "$env_stripped" =~ ^--[[:space:]]+(.*) ]]; then
+        env_stripped="${BASH_REMATCH[1]}"
+        break  # -- ends option processing
+      elif [[ "$env_stripped" =~ ^-u[[:space:]]+[A-Za-z_][A-Za-z0-9_]*[[:space:]]+(.*) ]]; then
+        env_stripped="${BASH_REMATCH[1]}"
+      elif [[ "$env_stripped" =~ ^-[i0S][[:space:]]+(.*) ]]; then
+        env_stripped="${BASH_REMATCH[1]}"
+      elif [[ "$env_stripped" =~ ^-S[[:space:]]+(.*) ]]; then
+        env_stripped="${BASH_REMATCH[1]}"
+      else
+        break
+      fi
+    done
+    # Strip any VAR=val after env and its flags
     while [[ "$env_stripped" =~ ^[A-Za-z_][A-Za-z0-9_]*=(\"[^\"]*\"|\'[^\']*\'|[^[:space:]]*)[[:space:]]+(.*) ]]; do
       env_stripped="${BASH_REMATCH[2]}"
     done
