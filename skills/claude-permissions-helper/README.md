@@ -52,6 +52,13 @@ The compound-bash hook activates immediately — no manual `settings.json` editi
 
 # 3. Review what's installed
 /audit-permissions
+
+# 4. Command got denied? Diagnose it instantly:
+/audit-permissions comm -13 <(git show HEAD~2:file | sort) <(sort file2)
+# → Decomposes compound commands into sub-commands
+# → Identifies which binary is missing from your allow list
+# → Shows risk level (LOW/MEDIUM/HIGH)
+# → Offers one-click fix for low/medium risk commands
 ```
 
 ## Available Presets
@@ -60,7 +67,7 @@ The compound-bash hook activates immediately — no manual `settings.json` editi
 
 | Preset | Description | Rules |
 |--------|-------------|-------|
-| `core` | Shell builtins, file ops, text processing — no network tools | 87 |
+| `core` | Shell builtins, file ops, text processing — no network tools | 98 |
 | `readonly-tools` | Read, Glob, Grep, WebSearch, WebFetch, MCP resource tools | 7 |
 
 ### Version Control
@@ -161,7 +168,24 @@ The compound-bash hook requires:
 | Command | Description |
 |---------|-------------|
 | `/setup-permissions` | Interactive preset selection with auto-detection and installation |
-| `/audit-permissions` | Read-only report of installed rules, preset coverage, and recommendations |
+| `/audit-permissions` | Full audit report of installed rules, preset coverage, and recommendations |
+| `/audit-permissions <command>` | **Diagnose mode** — explains why a command was denied and offers to fix it |
+
+### Diagnose Mode
+
+When a command triggers a permission prompt, paste it after `/audit-permissions` to get an instant diagnosis:
+
+```
+/audit-permissions openssl rand -hex 16 | fold -w4 | paste -sd'-' -
+```
+
+Diagnose mode will:
+1. **Decompose** compound commands (pipes, chains, subshells, `$(...)`) into individual sub-commands using the same `shfmt` parser as the hook
+2. **Check each binary** against your settings files and all available presets
+3. **Classify risk** — LOW (read-only tools), MEDIUM (file modification), HIGH (network/destructive)
+4. **Offer a fix** — for low/medium risk binaries, presents an `AskUserQuestion` to add the rule to global or project settings. High-risk binaries require an explicit request.
+
+It also works if you paste error messages — it'll extract the command from within them.
 
 ## Managing Permissions
 

@@ -18,6 +18,8 @@
       "Bash(continue *)",
       "Bash(exit *)",
       "Bash(return *)",
+      "Bash(rev *)",
+      "Bash(exec *)",
       "Bash(export *)",
       "Bash(local *)",
       "Bash(declare *)",
@@ -50,6 +52,7 @@
       "Bash(dirname *)",
       "Bash(realpath *)",
       "Bash(readlink *)",
+      "Bash(mkfifo *)",
       "Bash(mktemp *)",
       "Bash(seq *)",
       "Bash(true *)",
@@ -66,6 +69,8 @@
       "Bash(md5 *)",
       "Bash(sed *)",
       "Bash(awk *)",
+      "Bash(comm *)",
+      "Bash(fold *)",
       "Bash(diff *)",
       "Bash(cmp *)",
       "Bash(file *)",
@@ -93,6 +98,7 @@
       "Bash(command *)",
       "Bash(xargs *)",
       "Bash(env *)",
+      "Bash(wait *)",
       "Bash(bash *)",
       "Bash(sh *)"
     ]

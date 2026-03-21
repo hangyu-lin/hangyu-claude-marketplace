@@ -39,6 +39,10 @@ run_hook() {
 
 is_allow() { [[ $? -eq 0 ]] && jq -e '.hookSpecificOutput.permissionDecision == "allow"' <<< "$RESULT" &>/dev/null; }
 is_deny()  { [[ $? -eq 2 ]] || jq -e '.hookSpecificOutput.permissionDecision == "deny"' <<< "$RESULT" &>/dev/null; }
+# Fallthrough: exit 0, either empty output or systemMessage-only (no permissionDecision)
+is_fallthrough() {
+  [[ $1 -eq 0 ]] && { [[ -z "$RESULT" ]] || { jq -e '.systemMessage' <<< "$RESULT" &>/dev/null && ! jq -e '.hookSpecificOutput.permissionDecision' <<< "$RESULT" &>/dev/null; }; }
+}
 
 # ---------------------------------------------------------------------------
 echo "=== Simple commands ==="
@@ -61,7 +65,7 @@ fi
 
 run_hook "unknown-cmd foo" '["Bash(git *)"]'
 rc=$?
-if [[ $rc -eq 0 ]] && [[ -z "$RESULT" ]]; then
+if is_fallthrough $rc; then
   pass "simple fallthrough: unknown command"
 else
   fail "simple fallthrough: unknown command" "exit=$rc output=$RESULT"
@@ -88,7 +92,7 @@ fi
 
 run_hook "git status && unknown-cmd" '["Bash(git *)"]'
 rc=$?
-if [[ $rc -eq 0 ]] && [[ -z "$RESULT" ]]; then
+if is_fallthrough $rc; then
   pass "compound fallthrough: git status && unknown-cmd"
 else
   fail "compound fallthrough: git status && unknown-cmd" "exit=$rc output=$RESULT"
@@ -210,7 +214,7 @@ fi
 
 run_hook "env rm -rf /" '["Bash(git *)"]'
 rc=$?
-if [[ $rc -eq 0 ]] && [[ -z "$RESULT" ]]; then
+if is_fallthrough $rc; then
   pass "env launcher fallthrough: env rm -rf / (rm not allowed)"
 else
   fail "env launcher fallthrough: env rm -rf / (rm not allowed)" "exit=$rc output=$RESULT"

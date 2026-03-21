@@ -42,6 +42,12 @@ deny() {
   }'
   exit 2
 }
+# Hint: exit without approving/denying, but inject a system message suggesting
+# /audit-permissions. Claude Code's native permission prompt still appears.
+hint_and_passthrough() {
+  jq -n --arg msg "$1" '{ systemMessage: $msg }'
+  exit 0
+}
 
 # ---------------------------------------------------------------------------
 # Permission loading (single pass over all settings files)
@@ -508,8 +514,8 @@ main() {
   if ! needs_compound_parse "$command"; then
     debug "Simple command"
     is_allowed "$command" && approve
-    matches_prefix_list "$command" denied_prefixes "deny" && deny "Denied: '${LAST_MATCHED_CMD}' matched deny rule '${LAST_MATCHED_RULE}'"
-    exit 0
+    matches_prefix_list "$command" denied_prefixes "deny" && deny "Denied: '${LAST_MATCHED_CMD}' matched deny rule '${LAST_MATCHED_RULE}'. Run /audit-permissions ${command} to diagnose and fix."
+    hint_and_passthrough "Command not auto-approved: no matching allow rule found. Tip: run /audit-permissions <command> to diagnose why and optionally add the missing rule."
   fi
 
   # Compound command — parse into segments and check each
@@ -525,8 +531,8 @@ main() {
 
   # Not all approved: actively deny if any segment is in the deny list,
   # otherwise fall through to Claude Code's native permission prompt.
-  any_denied extracted_commands && deny "Compound command denied: sub-command '${LAST_MATCHED_CMD}' matched deny rule '${LAST_MATCHED_RULE}'"
-  exit 0
+  any_denied extracted_commands && deny "Compound command denied: sub-command '${LAST_MATCHED_CMD}' matched deny rule '${LAST_MATCHED_RULE}'. Run /audit-permissions <command> to diagnose and fix."
+  hint_and_passthrough "Compound command not fully auto-approved: one or more sub-commands lack allow rules. Tip: run /audit-permissions <command> to diagnose and fix."
 }
 
 main "$@"
