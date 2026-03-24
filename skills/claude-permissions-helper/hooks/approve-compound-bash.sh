@@ -134,6 +134,8 @@ def find_cmd_substs:
       (.Exp?.Word | find_cmd_substs),
       (.Repl?.Orig | find_cmd_substs),
       (.Repl?.With | find_cmd_substs)
+    elif .Type == "ArithmExp" or .Type == "BinaryArithm" or .Type == "UnaryArithm" or .Type == "ParenArithm" then
+      (.X | find_cmd_substs), (if .Y then .Y | find_cmd_substs else empty end)
     elif .Parts then .Parts[]? | find_cmd_substs
     else empty
     end

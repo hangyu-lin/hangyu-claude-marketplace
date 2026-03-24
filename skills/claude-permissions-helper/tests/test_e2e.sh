@@ -819,6 +819,160 @@ expect_allow "kubectl exec -it pod -- sh (kubectl in preset)" \
 # These are known limitations: build/devops tools can escape to shell.
 # The preset trusts these tools — users who install devops preset accept this.
 
+# ===========================================================================
+# ADVERSARIAL: previously untested attack vectors
+# ===========================================================================
+
+echo "=== ADVERSARIAL: background execution (&) ==="
+
+# & is a compound operator — shfmt should parse it, inner commands must be checked
+expect_not_approved "rm -rf / & (background dangerous cmd)" \
+  "rm -rf / &"
+expect_not_approved "git status & rm -rf / (bg safe, fg dangerous)" \
+  "git status & rm -rf /"
+expect_not_approved "(rm -rf /) & (subshell + background)" \
+  "(rm -rf /) &"
+
+# ===========================================================================
+echo "=== ADVERSARIAL: trap injection ==="
+
+# trap IS in the core preset — auto-approves (trap args are opaque strings, not commands)
+expect_allow "trap 'rm -rf /' EXIT (trap in core preset, args opaque)" \
+  "trap 'rm -rf /' EXIT"
+# Compound: both git status and trap are in allow list
+expect_allow "git status; trap 'rm -rf /' EXIT (both in preset)" \
+  "git status; trap 'rm -rf /' EXIT"
+# trap disabling signal then dangerous command
+expect_not_approved "trap '' INT; rm -rf / (trap + dangerous)" \
+  "trap '' INT; rm -rf /"
+
+# ===========================================================================
+echo "=== ADVERSARIAL: here-doc injection ==="
+
+# bash/sh not in allow preset — should fallthrough
+expect_not_approved "bash << EOF with dangerous body (bash not in preset)" \
+  $'bash << \'EOF\'\nrm -rf /\nEOF'
+expect_not_approved "sh -s << EOF with dangerous body (sh not in preset)" \
+  $'sh -s << EOF\nrm -rf /\nEOF'
+
+# ===========================================================================
+echo "=== ADVERSARIAL: redirection with dangerous commands ==="
+
+# Redirections shouldn't make dangerous commands pass
+expect_not_approved "rm -rf / > /dev/null (redirect stdout)" \
+  "rm -rf / > /dev/null"
+expect_not_approved "rm -rf / 2>/dev/null (redirect stderr)" \
+  "rm -rf / 2>/dev/null"
+# Command substitution in redirect target
+expect_not_approved 'echo safe > $(rm -rf /) (cmd sub in redirect)' \
+  'echo safe > $(rm -rf /)'
+# cat IS in the core preset — auto-approves regardless of args/redirects
+# Known limitation: presets trust the command, can't restrict arguments
+expect_allow "cat /etc/shadow > /tmp/stolen (cat in preset, args opaque)" \
+  "cat /etc/shadow > /tmp/stolen"
+
+# ===========================================================================
+echo "=== ADVERSARIAL: ANSI-C quoting / hex escapes ==="
+
+# Shell resolves $'\x72\x6d' to "rm" at runtime, but hook sees literal text
+# which won't match any prefix → fallthrough (safe)
+expect_not_approved "\$'\\x72\\x6d' -rf / (hex escape for rm)" \
+  $'$\'\\x72\\x6d\' -rf /'
+expect_not_approved "\$'\\162\\155' -rf / (octal escape for rm)" \
+  $'$\'\\162\\155\' -rf /'
+expect_not_approved "\$'\\147\\151\\164' status (octal for git)" \
+  $'$\'\\147\\151\\164\' status'
+
+# ===========================================================================
+echo "=== ADVERSARIAL: coproc / async constructs ==="
+
+expect_not_approved "coproc { rm -rf /; } (coproc dangerous)" \
+  "coproc { rm -rf /; }"
+expect_not_approved "{ rm -rf / ; } & (block + background)" \
+  "{ rm -rf / ; } &"
+
+# ===========================================================================
+echo "=== ADVERSARIAL: arithmetic with command substitution ==="
+
+# FIXED: $(cmd) inside $((...)) — parser now recurses into ArithmExp nodes
+expect_deny 'echo $(($(rm -rf /))) (cmd sub in arithmetic, FIXED)' \
+  'echo $(($(rm -rf /)))'
+expect_not_approved 'x=$(($(rm -rf /))) (assign arithmetic cmd sub)' \
+  'x=$(($(rm -rf /)))'
+
+# ===========================================================================
+echo "=== ADVERSARIAL: deeply nested command substitution ==="
+
+expect_not_approved 'echo $(echo $(rm -rf /)) (double nested cmd sub)' \
+  'echo $(echo $(rm -rf /))'
+expect_not_approved 'echo "$(cat "$(rm -rf /)")" (nested quoted cmd sub)' \
+  'echo "$(cat "$(rm -rf /)")"'
+
+# ===========================================================================
+echo "=== ADVERSARIAL: assignment + dangerous command ==="
+
+# Semicolon separates assignment from dangerous command
+expect_not_approved "x=safe; rm -rf / (assign then dangerous)" \
+  "x=safe; rm -rf /"
+# Env var prefix before dangerous command — strip_prefixes should handle
+expect_not_approved "PATH=/tmp:\$PATH rm -rf / (env var before rm)" \
+  'PATH=/tmp:$PATH rm -rf /'
+expect_not_approved "IFS=/ rm -rf / (IFS manipulation before rm)" \
+  "IFS=/ rm -rf /"
+
+# ===========================================================================
+echo "=== ADVERSARIAL: shell builtins / options ==="
+
+# set/shopt not in any preset — compound should catch the dangerous part
+expect_not_approved "set -e; rm -rf / (shell option + dangerous)" \
+  "set -e; rm -rf /"
+expect_not_approved "shopt -s globstar; rm -rf /** (shopt + dangerous)" \
+  "shopt -s globstar; rm -rf /**"
+
+# ===========================================================================
+echo "=== ADVERSARIAL: line continuation ==="
+
+# Backslash-newline is a line continuation in bash
+expect_not_approved $'rm \\\n-rf / (line continuation)' \
+  $'rm \\\n-rf /'
+expect_deny $'git push \\\n--force origin main (line continuation force push)' \
+  $'git push \\\n--force origin main'
+
+# ===========================================================================
+echo "=== ADVERSARIAL: tab as whitespace ==="
+
+# Tab between command and args — prefix matching uses space, tab won't match
+expect_not_approved $'git\tstatus (tab separator, won\'t match space prefix)' \
+  $'git\tstatus'
+expect_not_approved $'echo\thello (tab separator)' \
+  $'echo\thello'
+
+# ===========================================================================
+echo "=== ADVERSARIAL: null bytes ==="
+
+# KNOWN LIMITATION: null bytes truncate in jq (C strings). jq sees only "git status".
+# Not exploitable: JSON spec forbids null bytes, so Claude Code can never send them.
+# Bash also strips null bytes before execution. Marking as expected allow.
+expect_allow $'git status\\x00rm -rf / (null byte truncation, KNOWN LIMITATION)' \
+  $'git status\x00rm -rf /'
+
+# ===========================================================================
+echo "=== ADVERSARIAL: empty segments / multiple semicolons ==="
+
+expect_not_approved ";;; rm -rf / (leading semicolons)" \
+  ";;; rm -rf /"
+# Multiple semicolons with safe command — may or may not parse
+expect_not_approved "; ; ; git status (empty segments)" \
+  "; ; ; git status"
+
+# ===========================================================================
+echo "=== ADVERSARIAL: while/until with dangerous body ==="
+
+expect_not_approved "while rm -rf /; do :; done (dangerous condition)" \
+  "while rm -rf /; do :; done"
+expect_not_approved "until false; do rm -rf /; done (dangerous body)" \
+  "until false; do rm -rf /; done"
+
 # ---------------------------------------------------------------------------
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
