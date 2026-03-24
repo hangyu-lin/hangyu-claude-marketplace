@@ -825,12 +825,12 @@ expect_allow "kubectl exec -it pod -- sh (kubectl in preset)" \
 
 echo "=== ADVERSARIAL: background execution (&) ==="
 
-# & is a compound operator — shfmt should parse it, inner commands must be checked
-expect_not_approved "rm -rf / & (background dangerous cmd)" \
+# & is a compound operator — shfmt parses it, rm -rf / extracted and denied
+expect_deny "rm -rf / & (background dangerous cmd)" \
   "rm -rf / &"
-expect_not_approved "git status & rm -rf / (bg safe, fg dangerous)" \
+expect_deny "git status & rm -rf / (bg safe, fg dangerous)" \
   "git status & rm -rf /"
-expect_not_approved "(rm -rf /) & (subshell + background)" \
+expect_deny "(rm -rf /) & (subshell + background)" \
   "(rm -rf /) &"
 
 # ===========================================================================
@@ -858,10 +858,10 @@ expect_not_approved "sh -s << EOF with dangerous body (sh not in preset)" \
 # ===========================================================================
 echo "=== ADVERSARIAL: redirection with dangerous commands ==="
 
-# Redirections shouldn't make dangerous commands pass
-expect_not_approved "rm -rf / > /dev/null (redirect stdout)" \
+# Redirections don't hide dangerous commands — rm -rf / still extracted and denied
+expect_deny "rm -rf / > /dev/null (redirect stdout)" \
   "rm -rf / > /dev/null"
-expect_not_approved "rm -rf / 2>/dev/null (redirect stderr)" \
+expect_deny "rm -rf / 2>/dev/null (redirect stderr)" \
   "rm -rf / 2>/dev/null"
 # Command substitution in redirect target
 expect_not_approved 'echo safe > $(rm -rf /) (cmd sub in redirect)' \
@@ -897,8 +897,14 @@ echo "=== ADVERSARIAL: arithmetic with command substitution ==="
 # FIXED: $(cmd) inside $((...)) — parser now recurses into ArithmExp nodes
 expect_deny 'echo $(($(rm -rf /))) (cmd sub in arithmetic, FIXED)' \
   'echo $(($(rm -rf /)))'
-expect_not_approved 'x=$(($(rm -rf /))) (assign arithmetic cmd sub)' \
+expect_deny 'x=$(($(rm -rf /))) (assign arithmetic cmd sub)' \
   'x=$(($(rm -rf /)))'
+# BinaryArithm: cmd sub in both .X and .Y operands
+expect_deny 'echo $(($(rm -rf /) + $(wget evil)))' \
+  'echo $(($(rm -rf /) + $(wget evil)))'
+# Ternary: cmd sub in true branch (shfmt represents as nested BinaryArithm)
+expect_deny 'echo $(( a ? $(rm -rf /) : 0 ))' \
+  'echo $(( a ? $(rm -rf /) : 0 ))'
 
 # ===========================================================================
 echo "=== ADVERSARIAL: deeply nested command substitution ==="
@@ -911,22 +917,24 @@ expect_not_approved 'echo "$(cat "$(rm -rf /)")" (nested quoted cmd sub)' \
 # ===========================================================================
 echo "=== ADVERSARIAL: assignment + dangerous command ==="
 
-# Semicolon separates assignment from dangerous command
-expect_not_approved "x=safe; rm -rf / (assign then dangerous)" \
+# Semicolon separates assignment from dangerous command — rm denied
+expect_deny "x=safe; rm -rf / (assign then dangerous)" \
   "x=safe; rm -rf /"
-# Env var prefix before dangerous command — strip_prefixes should handle
-expect_not_approved "PATH=/tmp:\$PATH rm -rf / (env var before rm)" \
+# Env var prefix before dangerous command — strip_prefixes exposes rm, denied
+expect_deny "PATH=/tmp:\$PATH rm -rf / (env var before rm)" \
   'PATH=/tmp:$PATH rm -rf /'
-expect_not_approved "IFS=/ rm -rf / (IFS manipulation before rm)" \
+expect_deny "IFS=/ rm -rf / (IFS manipulation before rm)" \
   "IFS=/ rm -rf /"
 
 # ===========================================================================
 echo "=== ADVERSARIAL: shell builtins / options ==="
 
-# set/shopt not in any preset — compound should catch the dangerous part
-expect_not_approved "set -e; rm -rf / (shell option + dangerous)" \
+# set IS in core preset, but compound catches the denied rm -rf /
+expect_deny "set -e; rm -rf / (set in preset, rm denied in compound)" \
   "set -e; rm -rf /"
-expect_not_approved "shopt -s globstar; rm -rf /** (shopt + dangerous)" \
+# shopt not in any preset; rm -rf /** doesn't match "rm -rf /" deny rule (glob suffix)
+# rm not in allow list either → falls through (safe)
+expect_not_approved "shopt -s globstar; rm -rf /** (rm not in preset)" \
   "shopt -s globstar; rm -rf /**"
 
 # ===========================================================================
