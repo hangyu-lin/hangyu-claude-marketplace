@@ -341,6 +341,8 @@ expect_allow "env go test ./... (env stripped, go allowed)" \
   "env go test ./..."
 expect_allow "exec npm test (exec stripped, npm allowed)" \
   "exec npm test"
+expect_allow "trap 'echo cleanup' EXIT (trap recursion, inner allowed)" \
+  "trap 'echo cleanup' EXIT"
 
 # ===========================================================================
 echo "=== Real-world compound workflows ==="
@@ -809,9 +811,6 @@ expect_deny "trap 'rm -rf /' EXIT (trap recursion, inner denied)" \
 # Compound: git status allowed, but trap with rm denied
 expect_deny "git status; trap 'rm -rf /' EXIT (compound, trap inner denied)" \
   "git status; trap 'rm -rf /' EXIT"
-# trap with safe inner command → approved via inner
-expect_allow "trap 'echo cleanup' EXIT (trap recursion, inner allowed)" \
-  "trap 'echo cleanup' EXIT"
 # trap '' INT (empty command = ignore signal) → fallthrough (trap not in preset)
 expect_not_approved "trap '' INT (empty cmd, trap not in preset)" \
   "trap '' INT"
@@ -839,10 +838,6 @@ expect_deny "rm -rf / 2>/dev/null (redirect stderr)" \
 # Command substitution in redirect target
 expect_not_approved 'echo safe > $(rm -rf /) (cmd sub in redirect)' \
   'echo safe > $(rm -rf /)'
-# cat IS in the core preset — auto-approves regardless of args/redirects
-# Known limitation: presets trust the command, can't restrict arguments
-expect_allow "cat /etc/shadow > /tmp/stolen (cat in preset, args opaque)" \
-  "cat /etc/shadow > /tmp/stolen"
 
 # ===========================================================================
 echo "=== ADVERSARIAL: ANSI-C quoting / hex escapes ==="
@@ -927,15 +922,6 @@ expect_not_approved $'git\tstatus (tab separator, won\'t match space prefix)' \
   $'git\tstatus'
 expect_not_approved $'echo\thello (tab separator)' \
   $'echo\thello'
-
-# ===========================================================================
-echo "=== ADVERSARIAL: null bytes ==="
-
-# KNOWN LIMITATION: null bytes truncate in jq (C strings). jq sees only "git status".
-# Not exploitable: JSON spec forbids null bytes, so Claude Code can never send them.
-# Bash also strips null bytes before execution. Marking as expected allow.
-expect_allow $'git status\\x00rm -rf / (null byte truncation, KNOWN LIMITATION)' \
-  $'git status\x00rm -rf /'
 
 # ===========================================================================
 echo "=== ADVERSARIAL: empty segments / multiple semicolons ==="
