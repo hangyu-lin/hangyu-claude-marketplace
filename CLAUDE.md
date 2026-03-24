@@ -27,21 +27,6 @@ Auto-approves compound Bash commands when every sub-command matches your allow l
 
 The `strip_prefixes()` function already handles stripping these wrappers, so `env git status` and `bash -c 'git status'` are approved via the inner command's allow rule without needing wrapper entries.
 
-### Security: language runtime presets are opaque
-
-The `python`, `node`, `ruby`, and similar presets auto-approve commands like `python3 -c '...'` and `node -e '...'` regardless of the code passed to them. **The hook cannot inspect what language runtimes execute.** For example:
-
-- `python3 -c 'import os; os.system("rm -rf /")'` → auto-approved (python3 in preset)
-- `node -e 'require("child_process").execSync("id")'` → auto-approved (node in preset)
-- `ruby -e 'system("rm -rf /")'` → auto-approved (ruby in preset)
-
-This is a fundamental limitation of prefix-based matching. Protection against malicious runtime code comes from:
-1. **Claude's own safety training** — Claude refuses to generate destructive code
-2. **Prompt injection awareness** — the primary risk vector for runtime escapes
-3. **Preset opt-in** — users who install language presets accept this trust boundary
-
-When reviewing presets, understand that any command-line tool that can execute arbitrary code (language runtimes, `make`, `docker`, `kubectl`) acts as an escape hatch from the hook's protection. The safety preset's deny list is defense-in-depth, not a comprehensive sandbox.
-
 ### Notable: `rm` and `chmod` are NOT in any preset
 
 These are deliberately excluded from the core preset because they're destructive. They fall through to the user prompt. This is by design.
@@ -54,8 +39,6 @@ These are deliberately excluded from the core preset because they're destructive
 | `rm -rf /.` / `/..` | Low | `rm` not in any preset |
 | `chmod a=rwx` (symbolic 777) | Low | `chmod` not in any preset |
 | `git push origin +main:main` (refspec) | Low | Obscure syntax, Claude unlikely to use |
-| Language runtime escapes | Medium | Claude's safety training, opt-in presets |
-| `make`/`kubectl` escape hatches | Low | Opt-in presets, opaque targets |
 
 ## Tests
 
