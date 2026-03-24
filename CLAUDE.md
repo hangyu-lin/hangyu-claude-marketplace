@@ -38,7 +38,6 @@ These are deliberately excluded from the core preset because they're destructive
 | `rm / -rf` (flag reorder) | Low | `rm` not in any allow preset |
 | `rm -rf /.` / `/..` | Low | `rm` not in any preset |
 | `chmod a=rwx` (symbolic 777) | Low | `chmod` not in any preset |
-| `git push origin +main:main` (refspec) | Low | Obscure syntax, Claude unlikely to use |
 
 ## Tests
 

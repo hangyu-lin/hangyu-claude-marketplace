@@ -152,6 +152,10 @@ ALL_DENY=$(jq -n '[
   "Bash(git push origin -f main)", "Bash(git push origin -f master)",
   "Bash(git push --force-with-lease --force origin main)",
   "Bash(git push --force-with-lease --force origin master)",
+  "Bash(git push origin +main:main)",
+  "Bash(git push origin +master:master)",
+  "Bash(git push +main:main)",
+  "Bash(git push +master:master)",
   "Bash(git reset --hard)",
   "Bash(docker run -v /:)", "Bash(docker run --volume /:)",
   "Bash(docker run --privileged)"
@@ -735,10 +739,17 @@ expect_deny "git push -f origin main" "git push -f origin main"
 # --force-with-lease followed by --force denied
 expect_deny "git push --force-with-lease --force origin main (double flag)" \
   "git push --force-with-lease --force origin main"
-# Refspec force push (+ref:ref) not in deny list.
-# Low risk: unusual syntax, Claude unlikely to generate.
-expect_allow "git push origin +main:main (refspec force, not in deny)" \
+# Refspec force push (+ref:ref) now denied
+expect_deny "git push origin +main:main (refspec force)" \
   "git push origin +main:main"
+expect_deny "git push origin +master:master (refspec force)" \
+  "git push origin +master:master"
+# Without explicit remote (default remote)
+expect_deny "git push +main:main (refspec force, no remote)" \
+  "git push +main:main"
+# Non-main refspec force push still allowed
+expect_allow "git push origin +feature:feature (refspec force, not main)" \
+  "git push origin +feature:feature"
 
 # ===========================================================================
 echo "=== SECURITY: git reset --hard variants ==="

@@ -109,7 +109,7 @@ The compound-bash hook activates immediately — no manual `settings.json` editi
 
 | Preset | Description | Rules |
 |--------|-------------|-------|
-| `safety` | Deny dangerous commands — rm -rf /, chmod 777, dd, mkfs, force-push to main/master, git reset --hard, docker root mount/privileged | 20 |
+| `safety` | Deny dangerous commands — rm -rf /, chmod 777, dd, mkfs, force-push to main/master (incl. refspec), git reset --hard, docker root mount/privileged | 24 |
 
 The safety preset uses `permissions.deny` (not `permissions.allow`). It blocks commands rather than allowing them. The `rm -rf ~` rule also catches `rm -rf ~/subdir` via prefix matching, which is intentional (Claude shouldn't delete home directory contents without confirmation).
 
