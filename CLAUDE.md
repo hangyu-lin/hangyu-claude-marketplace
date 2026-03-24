@@ -15,10 +15,11 @@ Auto-approves compound Bash commands when every sub-command matches your allow l
 ### How the hook works
 
 1. Reads the command from Claude Code's hook JSON input
-2. Loads allow/deny prefixes from all `settings.json` files
-3. **Simple commands**: checks deny first, then allow
-4. **Compound commands** (pipes, chains, subshells): parses via `shfmt` AST, extracts all sub-commands, checks each individually
-5. **`strip_prefixes()`** generates multiple matching candidates by stripping env vars (`FOO=bar`), launchers (`env`, `xargs`), shell wrappers (`bash -c`, `sh -c`), absolute paths, `eval`/`exec`, `time`/`nohup`/`command`/`builtin`
+2. Normalizes CR characters to LF (prevents CR injection attacks)
+3. Loads allow/deny prefixes from all `settings.json` files
+4. **Simple commands**: checks deny first, then allow
+5. **Compound commands** (pipes, chains, subshells): parses via `shfmt` AST, extracts all sub-commands, checks each individually
+6. **`strip_prefixes()`** generates multiple matching candidates by stripping env vars (`FOO=bar`), launchers (`env`, `xargs`), shell wrappers (`bash -c`, `sh -c`), absolute paths, `eval`/`exec`, `time`/`nohup`/`command`/`builtin`
 
 ### Security: no wrapper commands in presets
 
@@ -26,9 +27,35 @@ Auto-approves compound Bash commands when every sub-command matches your allow l
 
 The `strip_prefixes()` function already handles stripping these wrappers, so `env git status` and `bash -c 'git status'` are approved via the inner command's allow rule without needing wrapper entries.
 
+### Security: language runtime presets are opaque
+
+The `python`, `node`, `ruby`, and similar presets auto-approve commands like `python3 -c '...'` and `node -e '...'` regardless of the code passed to them. **The hook cannot inspect what language runtimes execute.** For example:
+
+- `python3 -c 'import os; os.system("rm -rf /")'` → auto-approved (python3 in preset)
+- `node -e 'require("child_process").execSync("id")'` → auto-approved (node in preset)
+- `ruby -e 'system("rm -rf /")'` → auto-approved (ruby in preset)
+
+This is a fundamental limitation of prefix-based matching. Protection against malicious runtime code comes from:
+1. **Claude's own safety training** — Claude refuses to generate destructive code
+2. **Prompt injection awareness** — the primary risk vector for runtime escapes
+3. **Preset opt-in** — users who install language presets accept this trust boundary
+
+When reviewing presets, understand that any command-line tool that can execute arbitrary code (language runtimes, `make`, `docker`, `kubectl`) acts as an escape hatch from the hook's protection. The safety preset's deny list is defense-in-depth, not a comprehensive sandbox.
+
 ### Notable: `rm` and `chmod` are NOT in any preset
 
 These are deliberately excluded from the core preset because they're destructive. They fall through to the user prompt. This is by design.
+
+### Known gaps (documented and tested)
+
+| Gap | Risk | Mitigation |
+|-----|------|------------|
+| `rm / -rf` (flag reorder) | Low | `rm` not in any allow preset |
+| `rm -rf /.` / `/..` | Low | `rm` not in any preset |
+| `chmod a=rwx` (symbolic 777) | Low | `chmod` not in any preset |
+| `git push origin +main:main` (refspec) | Low | Obscure syntax, Claude unlikely to use |
+| Language runtime escapes | Medium | Claude's safety training, opt-in presets |
+| `make`/`kubectl` escape hatches | Low | Opt-in presets, opaque targets |
 
 ## Tests
 
@@ -38,19 +65,15 @@ Tests live in `skills/claude-permissions-helper/tests/`. Run with:
 /opt/homebrew/bin/bash skills/claude-permissions-helper/tests/test_allow.sh
 /opt/homebrew/bin/bash skills/claude-permissions-helper/tests/test_deny.sh
 /opt/homebrew/bin/bash skills/claude-permissions-helper/tests/test_e2e.sh
-/opt/homebrew/bin/bash skills/claude-permissions-helper/tests/test_wrapper_bypass.sh
-/opt/homebrew/bin/bash skills/claude-permissions-helper/tests/test_nested_wrappers.sh
 ```
 
 | File | Tests | Purpose |
 |------|-------|---------|
 | `test_allow.sh` | 56 | Commands that should auto-approve |
 | `test_deny.sh` | 92 | Commands that should deny/fallthrough + infrastructure |
-| `test_e2e.sh` | 130 | All presets combined, real-world workflows |
-| `test_wrapper_bypass.sh` | 24 | Wrapper bypass vulnerability demo (expected failures with wrappers in allow list) |
-| `test_nested_wrappers.sh` | 40 | Nested wrapper combinations (expected failures with wrappers in allow list) |
+| `test_e2e.sh` | ~300 | All presets combined: real-world workflows, wrapper/nested/compound tests, adversarial security probing |
 
-`test_allow.sh`, `test_deny.sh`, and `test_e2e.sh` must all pass (0 failures). `test_wrapper_bypass.sh` and `test_nested_wrappers.sh` have expected failures — they demonstrate what goes wrong when wrappers ARE in the allow list.
+All 3 test files must pass with 0 failures.
 
 ## Rules
 
@@ -60,7 +83,4 @@ Tests live in `skills/claude-permissions-helper/tests/`. Run with:
 
 ### Run all tests before pushing
 
-Before pushing any change to the hook or presets, run all 5 test files and verify:
-- `test_allow.sh`: 0 failures
-- `test_deny.sh`: 0 failures
-- `test_e2e.sh`: 0 failures
+Before pushing any change to the hook or presets, run all 3 test files and verify 0 failures.

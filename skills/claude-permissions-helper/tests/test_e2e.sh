@@ -148,9 +148,13 @@ ALL_DENY=$(jq -n '[
   "Bash(mkfs *)", "Bash(dd *)",
   "Bash(git push --force origin main)", "Bash(git push --force origin master)",
   "Bash(git push -f origin main)", "Bash(git push -f origin master)",
+  "Bash(git push origin --force main)", "Bash(git push origin --force master)",
+  "Bash(git push origin -f main)", "Bash(git push origin -f master)",
   "Bash(git push --force-with-lease --force origin main)",
   "Bash(git push --force-with-lease --force origin master)",
-  "Bash(git reset --hard)"
+  "Bash(git reset --hard)",
+  "Bash(docker run -v /:)", "Bash(docker run --volume /:)",
+  "Bash(docker run --privileged)"
 ]')
 
 # ===========================================================================
@@ -601,9 +605,8 @@ expect_not_approved "rm -r -f / (split flags, rm not in preset)" "rm -r -f /"
 expect_not_approved "chmod a=rwx (symbolic 777, not in deny)" "chmod a=rwx file"
 # chmod ugo+rwx (another way to say 777)
 expect_not_approved "chmod ugo+rwx (symbolic 777, not in deny)" "chmod ugo+rwx file"
-# KNOWN GAP: git push with --force after remote name bypasses deny rule.
-# The deny rule "git push --force origin main" requires --force before origin.
-expect_allow "git push origin --force main (flag after remote, KNOWN GAP)" \
+# FIXED: git push with --force after remote name now has its own deny rule.
+expect_deny "git push origin --force main (reordered flag, FIXED)" \
   "git push origin --force main"
 expect_deny "git push --force origin main (standard order)" \
   "git push --force origin main"
@@ -797,10 +800,19 @@ echo "=== SECURITY: make/docker as escape hatches ==="
 # make can run arbitrary commands via Makefile
 expect_allow "make malicious-target (make in preset, Makefile opaque)" \
   "make malicious-target"
-# docker run with host mount
-expect_allow "docker run -v /:/host (docker in preset, mount opaque)" \
+# FIXED: docker run with host root mount now denied
+expect_deny "docker run -v /:/host (host root mount, FIXED)" \
   "docker run -v /:/host ubuntu cat /host/etc/shadow"
-# kubectl exec into pod
+# docker run --privileged now denied
+expect_deny "docker run --privileged (privileged mode, FIXED)" \
+  "docker run --privileged ubuntu"
+# docker run --volume variant
+expect_deny "docker run --volume /:/host (long flag, FIXED)" \
+  "docker run --volume /:/host ubuntu"
+# docker run with safe mount still allowed
+expect_allow "docker run -v ./app:/app (safe mount)" \
+  "docker run -v ./app:/app myimage"
+# kubectl exec into pod — allowed (kubectl in preset, can't restrict subcommands)
 expect_allow "kubectl exec -it pod -- sh (kubectl in preset)" \
   "kubectl exec -it pod -- sh"
 
