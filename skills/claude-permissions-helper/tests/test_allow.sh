@@ -4,30 +4,7 @@
 #
 # Requires: jq, shfmt, bash 4.3+
 
-set -uo pipefail
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HOOK="$SCRIPT_DIR/../hooks/approve-compound-bash.sh"
-
-BASH_BIN="${BASH_BIN:-/opt/homebrew/bin/bash}"
-if [[ "${BASH_VERSINFO[0]}" -lt 4 || ( "${BASH_VERSINFO[0]}" -eq 4 && "${BASH_VERSINFO[1]}" -lt 3 ) ]]; then
-  if [[ -x "$BASH_BIN" ]]; then exec "$BASH_BIN" "$0" "$@"; fi
-  echo "SKIP: bash 4.3+ required"; exit 0
-fi
-
-PASS=0 FAIL=0
-pass() { ((PASS++)); printf '  \033[32mPASS\033[0m %s\n' "$1"; }
-fail() { ((FAIL++)); printf '  \033[31mFAIL\033[0m %s — %s\n' "$1" "$2"; }
-
-run_hook() {
-  local cmd="$1" perms="$2" deny="${3:-}"
-  local input
-  input=$(jq -n --arg c "$cmd" '{"tool_input":{"command":$c}}')
-  local args=(--permissions "$perms")
-  [[ -n "$deny" ]] && args+=(--deny "$deny")
-  RESULT=$("$BASH_BIN" "$HOOK" "${args[@]}" <<< "$input" 2>/dev/null)
-  return $?
-}
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/test_helpers.sh"
 
 expect_allow() {
   local name="$1" cmd="$2" perms="$3" deny="${4:-}"
@@ -264,6 +241,4 @@ expect_allow_or_fallthrough "bare 'xargs' (defaults to echo)" \
   "xargs" '["Bash(xargs *)"]' "$XARGS_DENY"
 
 # ---------------------------------------------------------------------------
-echo ""
-echo "Results: $PASS passed, $FAIL failed"
-[[ $FAIL -eq 0 ]] && exit 0 || exit 1
+print_results
