@@ -31,14 +31,6 @@ The `strip_prefixes()` function already handles stripping these wrappers, so `en
 
 These are deliberately excluded from the core preset because they're destructive. They fall through to the user prompt. This is by design.
 
-### Known gaps (documented and tested)
-
-| Gap | Risk | Mitigation |
-|-----|------|------------|
-| `rm / -rf` (flag reorder) | Low | `rm` not in any allow preset |
-| `rm -rf /.` / `/..` | Low | `rm` not in any preset |
-| `chmod a=rwx` (symbolic 777) | Low | `chmod` not in any preset |
-
 ## Tests
 
 Tests live in `skills/claude-permissions-helper/tests/`. Run with:
