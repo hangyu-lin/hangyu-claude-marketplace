@@ -93,14 +93,8 @@
       "Bash(jq *)",
       "Bash(yq *)",
       "Bash(lsof *)",
-      "Bash(time *)",
       "Bash(pgrep *)",
-      "Bash(command *)",
-      "Bash(xargs *)",
-      "Bash(env *)",
-      "Bash(wait *)",
-      "Bash(bash *)",
-      "Bash(sh *)"
+      "Bash(wait *)"
     ]
   }
 }
