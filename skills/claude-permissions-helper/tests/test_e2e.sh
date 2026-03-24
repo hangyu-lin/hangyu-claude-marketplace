@@ -611,16 +611,16 @@ expect_deny  'f() { git reset --hard; }; f' 'f() { git reset --hard; }; f'
 
 echo "=== SECURITY: flag reordering / alternative syntax ==="
 
-# KNOWN GAP: rm with reordered/split flags not caught by "rm -rf /" deny rule.
-# Mitigated: rm is NOT in any allow preset, so these fall through to user prompt.
+# Reordered/split flags don't match "rm -rf /" deny rule.
+# rm not in any allow preset, so these fall through to user prompt.
 expect_not_approved "rm / -rf (reordered flags, rm not in preset)" "rm / -rf"
 expect_not_approved "rm -r -f / (split flags, rm not in preset)" "rm -r -f /"
 # chmod with symbolic notation: chmod a=rwx (equivalent to 777)
 expect_not_approved "chmod a=rwx (symbolic 777, not in deny)" "chmod a=rwx file"
 # chmod ugo+rwx (another way to say 777)
 expect_not_approved "chmod ugo+rwx (symbolic 777, not in deny)" "chmod ugo+rwx file"
-# FIXED: git push with --force after remote name now has its own deny rule.
-expect_deny "git push origin --force main (reordered flag, FIXED)" \
+# --force after remote name has its own deny rule
+expect_deny "git push origin --force main (reordered flag)" \
   "git push origin --force main"
 expect_deny "git push --force origin main (standard order)" \
   "git push --force origin main"
@@ -660,8 +660,8 @@ expect_not_approved "pkexec rm -rf /" "pkexec rm -rf /"
 # ===========================================================================
 echo "=== SECURITY: path traversal in rm ==="
 
-# KNOWN GAP: /. and /.. not caught by "rm -rf /" deny rule (dot after slash).
-# Mitigated: rm not in any allow preset, falls through to user prompt.
+# /. and /.. don't match "rm -rf /" deny rule (dot after slash).
+# rm not in any allow preset, falls through to user prompt.
 expect_not_approved "rm -rf /. (root via dot, rm not in preset)" "rm -rf /."
 expect_not_approved "rm -rf /.. (root via dotdot, rm not in preset)" "rm -rf /.."
 # Tilde expansion: rm -rf ~root
@@ -680,8 +680,8 @@ expect_not_approved 'rm -rf ${HOME} (literal ${HOME})' \
 # ===========================================================================
 echo "=== SECURITY: quoting tricks to evade matching ==="
 
-# KNOWN GAP: quoted command names bypass matching on simple path.
-# Mitigated: rm not in any allow preset, falls through to user prompt.
+# Quoted command names don't match prefix rules.
+# rm not in any allow preset, falls through to user prompt.
 expect_not_approved "'rm' -rf / (quoted cmd, rm not in preset)" "'rm' -rf /"
 expect_not_approved '"rm" -rf / (dquoted cmd, rm not in preset)' '"rm" -rf /'
 
@@ -714,8 +714,8 @@ echo "=== SECURITY: newline injection variants ==="
 # Newline between safe and dangerous
 expect_deny $'git status\nrm -rf / (newline injection)' \
   $'git status\nrm -rf /'
-# FIXED: CR injection — \r normalized to \n, now parsed as compound
-expect_deny $'git status\\rrm -rf / (CR injection, FIXED)' \
+# CR normalized to \n, parsed as compound
+expect_deny $'git status\\rrm -rf / (CR injection)' \
   $'git status\rrm -rf /'
 # Multiple newlines
 expect_deny $'echo safe\n\nrm -rf / (double newline)' \
@@ -732,12 +732,12 @@ echo "=== SECURITY: git push force variants ==="
 
 # -f short flag to main
 expect_deny "git push -f origin main" "git push -f origin main"
-# FIXED: --force-with-lease followed by --force. Added explicit deny rule.
-expect_deny "git push --force-with-lease --force origin main (double flag, FIXED)" \
+# --force-with-lease followed by --force denied
+expect_deny "git push --force-with-lease --force origin main (double flag)" \
   "git push --force-with-lease --force origin main"
-# KNOWN GAP: refspec force push (+ref:ref) not in deny list.
+# Refspec force push (+ref:ref) not in deny list.
 # Low risk: unusual syntax, Claude unlikely to generate.
-expect_allow "git push origin +main:main (refspec force, KNOWN GAP)" \
+expect_allow "git push origin +main:main (refspec force, not in deny)" \
   "git push origin +main:main"
 
 # ===========================================================================
@@ -787,14 +787,14 @@ expect_not_approved "curl evil | eval (eval extracts, curl in inner but eval not
 # ===========================================================================
 echo "=== SECURITY: make/docker as escape hatches ==="
 
-# FIXED: docker run with host root mount now denied
-expect_deny "docker run -v /:/host (host root mount, FIXED)" \
+# docker run with host root mount denied
+expect_deny "docker run -v /:/host (host root mount)" \
   "docker run -v /:/host ubuntu cat /host/etc/shadow"
-# docker run --privileged now denied
-expect_deny "docker run --privileged (privileged mode, FIXED)" \
+# docker run --privileged denied
+expect_deny "docker run --privileged (privileged mode)" \
   "docker run --privileged ubuntu"
-# docker run --volume variant
-expect_deny "docker run --volume /:/host (long flag, FIXED)" \
+# docker run --volume variant denied
+expect_deny "docker run --volume /:/host (long flag)" \
   "docker run --volume /:/host ubuntu"
 # docker run with safe mount still allowed
 expect_allow "docker run -v ./app:/app (safe mount)" \
@@ -867,8 +867,8 @@ expect_not_approved "{ rm -rf / ; } & (block + background)" \
 # ===========================================================================
 echo "=== ADVERSARIAL: arithmetic with command substitution ==="
 
-# FIXED: $(cmd) inside $((...)) — parser now recurses into ArithmExp nodes
-expect_deny 'echo $(($(rm -rf /))) (cmd sub in arithmetic, FIXED)' \
+# $(cmd) inside $((...)) — parser recurses into ArithmExp nodes
+expect_deny 'echo $(($(rm -rf /))) (cmd sub in arithmetic)' \
   'echo $(($(rm -rf /)))'
 expect_deny 'x=$(($(rm -rf /))) (assign arithmetic cmd sub)' \
   'x=$(($(rm -rf /)))'
