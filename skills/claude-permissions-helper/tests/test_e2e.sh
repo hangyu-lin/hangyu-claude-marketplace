@@ -76,7 +76,7 @@ ALL_ALLOW=$(jq -n '[
 ]')
 
 ALL_DENY=$(jq -n '[
-  "Bash(rm -rf /)", "Bash(rm -rf ~)",
+  "Bash(rm -rf /)", "Bash(rm -rf /* *)", "Bash(rm -rf ~)",
   "Bash(chmod 777)", "Bash(chmod -R 777)",
   "Bash(mkfs *)", "Bash(dd *)",
   "Bash(git push --force origin main)", "Bash(git push --force origin master)",

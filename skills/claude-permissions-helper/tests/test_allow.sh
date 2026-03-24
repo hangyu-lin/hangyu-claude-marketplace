@@ -158,8 +158,8 @@ SAFETY_ALLOW='["Bash(rm *)", "Bash(git *)", "Bash(chmod *)", "Bash(echo *)", "Ba
 
 expect_allow "rm -rf /tmp NOT denied by rm -rf / rule" \
   "rm -rf /tmp" '["Bash(git *)", "Bash(rm *)"]' '["Bash(rm -rf /)"]'
-expect_allow "rm -rf /* NOT caught by rm -rf / rule (known limitation)" \
-  "rm -rf /*" '["Bash(rm *)"]' '["Bash(rm -rf /)"]'
+expect_deny "rm -rf /* caught by rm -rf /* deny rule" \
+  "rm -rf /*" '["Bash(rm *)"]' '["Bash(rm -rf /)", "Bash(rm -rf /* *)"]'
 expect_allow "rm -rf ./build NOT denied" \
   "rm -rf ./build" '["Bash(rm *)"]' '["Bash(rm -rf /)"]'
 expect_allow "git reset --soft allowed (not matched by --hard rule)" \
