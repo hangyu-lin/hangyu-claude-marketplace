@@ -386,6 +386,205 @@ expect_not_approved "nc (netcat, not in any preset)" \
 expect_not_approved "nmap (not in any preset)" \
   "nmap -sS 10.0.0.1"
 
+# ===========================================================================
+echo "=== Wrapper stripping: env ==="
+
+expect_allow "env git status" "env git status"
+expect_allow "env FOO=bar git status" "env FOO=bar git status"
+expect_allow "env FOO=bar BAZ=1 go test ./..." "env FOO=bar BAZ=1 go test ./..."
+expect_allow "env -i PATH=/usr/bin git status" "env -i PATH=/usr/bin git status"
+expect_deny  "env rm -rf /" "env rm -rf /"
+expect_deny  "env -i rm -rf /" "env -i rm -rf /"
+expect_deny  "env -u PATH rm -rf /" "env -u PATH rm -rf /"
+expect_deny  "env -- rm -rf /" "env -- rm -rf /"
+expect_deny  "env -i FOO=bar rm -rf /" "env -i FOO=bar rm -rf /"
+expect_not_approved "env nc -l 4444 (nc not in preset)" "env nc -l 4444"
+expect_not_approved "env systemctl restart nginx" "env systemctl restart nginx"
+
+# ===========================================================================
+echo "=== Wrapper stripping: bash -c / sh -c ==="
+
+expect_allow "bash -c 'git status'" "bash -c 'git status'"
+expect_allow "bash -c 'go test ./...'" "bash -c 'go test ./...'"
+expect_allow "bash -c 'npm install'" "bash -c 'npm install'"
+expect_allow "sh -c 'git log --oneline'" "sh -c 'git log --oneline'"
+expect_allow "bash -xc 'git status' (combined flags)" "bash -xc 'git status'"
+expect_allow "bash -lc 'cargo build' (combined flags)" "bash -lc 'cargo build'"
+expect_deny  "bash -c 'rm -rf /'" "bash -c 'rm -rf /'"
+expect_deny  "sh -c 'git reset --hard'" "sh -c 'git reset --hard'"
+expect_deny  "bash -lc 'rm -rf /'" "bash -lc 'rm -rf /'"
+expect_not_approved "bash -c 'nc -l 4444' (nc not allowed)" "bash -c 'nc -l 4444'"
+expect_not_approved "sh -c 'nmap 10.0.0.1' (nmap not allowed)" "sh -c 'nmap 10.0.0.1'"
+expect_not_approved "bash /tmp/unknown-script.sh (can't inspect)" "bash /tmp/unknown-script.sh"
+expect_not_approved "sh /tmp/unknown-script.sh (can't inspect)" "sh /tmp/unknown-script.sh"
+
+# ===========================================================================
+echo "=== Wrapper stripping: exec ==="
+
+expect_allow "exec git status" "exec git status"
+expect_allow "exec npm test" "exec npm test"
+expect_allow "exec cargo build" "exec cargo build"
+expect_deny  "exec rm -rf /" "exec rm -rf /"
+expect_not_approved "exec nc -l 4444 (nc not allowed)" "exec nc -l 4444"
+
+# ===========================================================================
+echo "=== Wrapper stripping: eval ==="
+
+expect_allow "eval 'git status'" "eval 'git status'"
+expect_allow "eval 'go test ./...'" "eval 'go test ./...'"
+expect_deny  "eval 'rm -rf /'" "eval 'rm -rf /'"
+expect_deny  "eval 'git reset --hard'" "eval 'git reset --hard'"
+expect_not_approved "eval 'nc -l 4444'" "eval 'nc -l 4444'"
+
+# ===========================================================================
+echo "=== Wrapper stripping: time / nohup / command ==="
+
+expect_allow "time git status" "time git status"
+expect_allow "time -p go test ./..." "time -p go test ./..."
+expect_allow "command git status" "command git status"
+expect_not_approved "command -v git (git subcommand not matched)" "command -v git"
+expect_deny  "time rm -rf /" "time rm -rf /"
+expect_deny  "nohup rm -rf /" "nohup rm -rf /"
+expect_deny  "command rm -rf /" "command rm -rf /"
+expect_not_approved "time nc -l 4444" "time nc -l 4444"
+expect_not_approved "nohup nc -l 4444" "nohup nc -l 4444"
+
+# ===========================================================================
+echo "=== Wrapper stripping: xargs ==="
+
+expect_allow "xargs -n1 git status" "xargs -n1 git status"
+expect_allow "xargs -0 -r wc -l" "xargs -0 -r wc -l"
+expect_allow "xargs -P 4 -n 1 curl" "xargs -P 4 -n 1 curl"
+expect_deny  "xargs rm -rf /" "xargs rm -rf /"
+expect_not_approved "xargs -I {} rm -rf {} (rm not in preset)" "xargs -I {} rm -rf {}"
+expect_not_approved "xargs nc" "xargs nc"
+expect_not_approved "xargs -n1 nmap" "xargs -n1 nmap"
+
+# ===========================================================================
+echo "=== Wrapper stripping: absolute paths ==="
+
+expect_allow "/usr/bin/git status → normalized to git" "/usr/bin/git status"
+expect_allow "/opt/homebrew/bin/go test → normalized to go" "/opt/homebrew/bin/go test"
+expect_deny  "/bin/rm -rf / → normalized, denied" "/bin/rm -rf /"
+expect_deny  "/opt/homebrew/bin/bash -c 'rm -rf /' → inner denied" \
+  "/opt/homebrew/bin/bash -c 'rm -rf /'"
+
+# ===========================================================================
+echo "=== Nested wrappers: env + shell ==="
+
+expect_allow "env bash -c 'git status'" "env bash -c 'git status'"
+expect_allow "env sh -c 'go test ./...'" "env sh -c 'go test ./...'"
+expect_allow "env FOO=bar bash -c 'npm test'" "env FOO=bar bash -c 'npm test'"
+expect_deny  "env bash -c 'rm -rf /'" "env bash -c 'rm -rf /'"
+expect_deny  "env sh -c 'git reset --hard'" "env sh -c 'git reset --hard'"
+expect_deny  "env -i bash -c 'rm -rf /'" "env -i bash -c 'rm -rf /'"
+expect_not_approved "env bash -c 'nc -l 4444'" "env bash -c 'nc -l 4444'"
+expect_not_approved "env sh -c 'nmap 10.0.0.1'" "env sh -c 'nmap 10.0.0.1'"
+
+# ===========================================================================
+echo "=== Nested wrappers: command + shell ==="
+
+expect_allow "command bash -c 'git status'" "command bash -c 'git status'"
+expect_allow "command -p sh -c 'go build'" "command -p sh -c 'go build'"
+expect_deny  "command sh -c 'rm -rf /'" "command sh -c 'rm -rf /'"
+expect_deny  "command -p sh -c 'rm -rf /'" "command -p sh -c 'rm -rf /'"
+expect_deny  "command eval 'rm -rf /'" "command eval 'rm -rf /'"
+expect_not_approved "command bash -c 'nc -l 4444'" "command bash -c 'nc -l 4444'"
+
+# ===========================================================================
+echo "=== Nested wrappers: time/nohup + shell ==="
+
+expect_allow "time bash -c 'git status'" "time bash -c 'git status'"
+expect_allow "nohup env git fetch" "nohup env git fetch"
+expect_deny  "time sh -c 'rm -rf /'" "time sh -c 'rm -rf /'"
+expect_deny  "nohup sh -c 'rm -rf /'" "nohup sh -c 'rm -rf /'"
+expect_not_approved "time bash -c 'nc -l 4444'" "time bash -c 'nc -l 4444'"
+expect_not_approved "nohup bash -c 'nc -l 4444'" "nohup bash -c 'nc -l 4444'"
+
+# ===========================================================================
+echo "=== Nested wrappers: double command prefix ==="
+
+expect_allow "command command git status" "command command git status"
+expect_deny  "command command rm -rf /" "command command rm -rf /"
+
+# ===========================================================================
+echo "=== Nested wrappers: triple+ depth ==="
+
+expect_allow "env exec bash -c 'git status'" "env exec bash -c 'git status'"
+expect_allow "command env exec bash -c 'git log'" \
+  "command env exec bash -c 'git log'"
+expect_allow "nohup env git status" "nohup env git status"
+expect_deny  "env exec bash -c 'rm -rf /'" "env exec bash -c 'rm -rf /'"
+expect_deny  "nohup bash -c 'rm -rf ~'" "nohup bash -c 'rm -rf ~'"
+expect_not_approved "env exec bash -c 'nc -l 4444'" \
+  "env exec bash -c 'nc -l 4444'"
+expect_not_approved "command bash -c 'nmap 10.0.0.1'" \
+  "command bash -c 'nmap 10.0.0.1'"
+expect_not_approved "time nohup env bash -c 'nc -l 4444'" \
+  "time nohup env bash -c 'nc -l 4444'"
+
+# ===========================================================================
+echo "=== Nested wrappers: xargs + shell ==="
+
+expect_allow "xargs -n1 bash -c 'git status'" "xargs -n1 bash -c 'git status'"
+expect_deny  "xargs bash -c 'rm -rf /'" "xargs bash -c 'rm -rf /'"
+expect_deny  "xargs eval 'rm -rf /'" "xargs eval 'rm -rf /'"
+expect_not_approved "xargs bash -c 'nc -l 4444'" "xargs bash -c 'nc -l 4444'"
+expect_not_approved "xargs env nc" "xargs env nc"
+expect_not_approved "xargs -n1 env sh -c 'nmap 10.0.0.1'" \
+  "xargs -n1 env sh -c 'nmap 10.0.0.1'"
+
+# ===========================================================================
+echo "=== Compound + wrappers (pipe/chain forces compound parsing) ==="
+
+expect_allow "git status | env bash -c 'git log'" \
+  "git status | env bash -c 'git log'"
+expect_allow "echo ok && exec npm test" "echo ok && exec npm test"
+expect_allow "env go build && go test" "env go build && go test"
+expect_deny  "echo ok | bash -c 'rm -rf /'" "echo ok | bash -c 'rm -rf /'"
+expect_deny  "git status && env rm -rf /" "git status && env rm -rf /"
+expect_deny  "git status; nohup bash -c 'rm -rf /'" \
+  "git status; nohup bash -c 'rm -rf /'"
+expect_deny  "echo safe | command sh -c 'rm -rf /'" \
+  "echo safe | command sh -c 'rm -rf /'"
+expect_not_approved "git status | env bash -c 'nc -l 4444'" \
+  "git status | env bash -c 'nc -l 4444'"
+expect_not_approved "echo hi && exec nc -l 4444" "echo hi && exec nc -l 4444"
+expect_not_approved "git status; nohup bash -c 'nmap 10.0.0.1'" \
+  "git status; nohup bash -c 'nmap 10.0.0.1'"
+
+# ===========================================================================
+echo "=== Compound + nested wrappers: subshells ==="
+
+expect_allow "(git status && git log)" "(git status && git log)"
+expect_allow "(env git status)" "(env git status)"
+expect_deny  "(rm -rf /)" "(rm -rf /)"
+expect_deny  "(git status && (rm -rf /))" "(git status && (rm -rf /))"
+expect_deny  "(env bash -c 'rm -rf /')" "(env bash -c 'rm -rf /')"
+
+# ===========================================================================
+echo "=== Compound + nested wrappers: shell constructs ==="
+
+expect_allow "if git status; then echo ok; fi" \
+  "if git status; then echo ok; fi"
+expect_deny  "if true; then rm -rf /; fi" \
+  "if true; then rm -rf /; fi"
+expect_deny  "for i in a b; do rm -rf /; done" \
+  "for i in a b; do rm -rf /; done"
+
+# ===========================================================================
+echo "=== Compound + nested wrappers: command substitution ==="
+
+expect_allow 'echo "$(git status)"' 'echo "$(git status)"'
+expect_deny  'echo "$(rm -rf /)"' 'echo "$(rm -rf /)"'
+expect_deny  'x=$(rm -rf /)' 'x=$(rm -rf /)'
+
+# ===========================================================================
+echo "=== Compound + nested wrappers: function declarations ==="
+
+expect_deny  'f() { rm -rf /; }; f' 'f() { rm -rf /; }; f'
+expect_deny  'f() { git reset --hard; }; f' 'f() { git reset --hard; }; f'
+
 # ---------------------------------------------------------------------------
 echo ""
 echo "Results: $PASS passed, $FAIL failed"
