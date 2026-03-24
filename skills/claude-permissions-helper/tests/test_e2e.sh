@@ -341,8 +341,6 @@ expect_allow "env go test ./... (env stripped, go allowed)" \
   "env go test ./..."
 expect_allow "exec npm test (exec stripped, npm allowed)" \
   "exec npm test"
-expect_allow "trap 'echo cleanup' EXIT (trap recursion, inner allowed)" \
-  "trap 'echo cleanup' EXIT"
 
 # ===========================================================================
 echo "=== Real-world compound workflows ==="
@@ -434,6 +432,20 @@ expect_allow "exec npm test" "exec npm test"
 expect_allow "exec cargo build" "exec cargo build"
 expect_deny  "exec rm -rf /" "exec rm -rf /"
 expect_not_approved "exec nc -l 4444 (nc not allowed)" "exec nc -l 4444"
+
+# ===========================================================================
+echo "=== Wrapper stripping: trap ==="
+
+expect_allow "trap 'echo cleanup' EXIT (inner allowed)" \
+  "trap 'echo cleanup' EXIT"
+expect_allow "trap 'git status' EXIT (inner allowed)" \
+  "trap 'git status' EXIT"
+expect_deny  "trap 'rm -rf /' EXIT (inner denied)" \
+  "trap 'rm -rf /' EXIT"
+expect_not_approved "trap '' INT (empty cmd, trap not in preset)" \
+  "trap '' INT"
+expect_not_approved "trap -l (flag only, trap not in preset)" \
+  "trap -l"
 
 # ===========================================================================
 echo "=== Wrapper stripping: eval ==="
@@ -802,18 +814,11 @@ expect_deny "(rm -rf /) & (subshell + background)" \
   "(rm -rf /) &"
 
 # ===========================================================================
-echo "=== ADVERSARIAL: trap injection ==="
+echo "=== ADVERSARIAL: trap in compound ==="
 
-# FIXED: trap removed from preset, hook now recurses into trap's command arg
-# trap 'rm -rf /' → inner rm -rf / extracted → denied
-expect_deny "trap 'rm -rf /' EXIT (trap recursion, inner denied)" \
-  "trap 'rm -rf /' EXIT"
 # Compound: git status allowed, but trap with rm denied
 expect_deny "git status; trap 'rm -rf /' EXIT (compound, trap inner denied)" \
   "git status; trap 'rm -rf /' EXIT"
-# trap '' INT (empty command = ignore signal) → fallthrough (trap not in preset)
-expect_not_approved "trap '' INT (empty cmd, trap not in preset)" \
-  "trap '' INT"
 # trap disabling signal then dangerous command
 expect_deny "trap '' INT; rm -rf / (trap + dangerous)" \
   "trap '' INT; rm -rf /"
