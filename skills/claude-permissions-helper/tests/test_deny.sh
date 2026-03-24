@@ -288,9 +288,9 @@ echo "=== SECURITY: xargs * edge cases ==="
 XARGS_ALLOW='["Bash(xargs *)", "Bash(cat *)", "Bash(find *)", "Bash(echo *)"]'
 XARGS_DENY='["Bash(rm -rf /)", "Bash(rm -rf ~)", "Bash(chmod 777)"]'
 
-expect_not_approved "SECURITY: xargs -I{} sh -c '{}' (opaque placeholder)" \
+expect_fallthrough "SECURITY: xargs -I{} sh -c '{}' (opaque placeholder)" \
   "xargs -I{} sh -c '{}'" '["Bash(xargs *)"]' "$XARGS_DENY"
-expect_not_approved "SECURITY: xargs -I {} sh -c '{}' (space-separated)" \
+expect_fallthrough "SECURITY: xargs -I {} sh -c '{}' (space-separated)" \
   "xargs -I {} sh -c '{}'" '["Bash(xargs *)"]' "$XARGS_DENY"
 expect_deny "SECURITY: find / | xargs rm -rf /" \
   "find / | xargs rm -rf /" '["Bash(find *)", "Bash(xargs *)", "Bash(rm *)"]' "$XARGS_DENY"

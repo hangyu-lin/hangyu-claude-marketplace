@@ -52,23 +52,6 @@ expect_allow() {
   fi
 }
 
-expect_allow_or_fallthrough() {
-  local name="$1" cmd="$2" perms="${3:-${ALL_ALLOW:-}}" deny="${4:-${ALL_DENY:-}}"
-  run_hook "$cmd" "$perms" "$deny"
-  local rc=$?
-  if [[ $rc -eq 0 ]]; then
-    if jq -e '.hookSpecificOutput.permissionDecision == "allow"' <<< "$RESULT" &>/dev/null; then
-      pass "$name (auto-approved)"
-    elif [[ -z "$RESULT" ]] || ! jq -e '.hookSpecificOutput.permissionDecision' <<< "$RESULT" &>/dev/null; then
-      pass "$name (fallthrough, also OK)"
-    else
-      fail "$name" "exit=$rc output=$RESULT"
-    fi
-  else
-    fail "$name" "exit=$rc output=$RESULT"
-  fi
-}
-
 expect_deny() {
   local name="$1" cmd="$2" perms="${3:-${ALL_ALLOW:-}}" deny="${4:-${ALL_DENY:-}}"
   run_hook "$cmd" "$perms" "$deny"
@@ -91,13 +74,3 @@ expect_fallthrough() {
   fi
 }
 
-expect_not_approved() {
-  local name="$1" cmd="$2" perms="${3:-${ALL_ALLOW:-}}" deny="${4:-${ALL_DENY:-}}"
-  run_hook "$cmd" "$perms" "$deny"
-  local rc=$?
-  if [[ $rc -eq 0 ]] && jq -e '.hookSpecificOutput.permissionDecision == "allow"' <<< "$RESULT" &>/dev/null; then
-    fail "$name → AUTO-APPROVED" "should not be approved"
-  else
-    pass "$name"
-  fi
-}

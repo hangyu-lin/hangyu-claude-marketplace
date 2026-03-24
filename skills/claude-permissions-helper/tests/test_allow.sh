@@ -192,23 +192,23 @@ expect_allow "git reset HEAD file.txt allowed (no --hard)" \
 # ---------------------------------------------------------------------------
 echo "=== Known limitations (allow is expected) ==="
 
-expect_allow_or_fallthrough "mkfs.ext4 /dev/sda NOT caught (period after mkfs)" \
+expect_fallthrough "mkfs.ext4 /dev/sda (period after mkfs, no prefix match)" \
   "mkfs.ext4 /dev/sda" "$SAFETY_ALLOW" "$SAFETY_DENY"
-expect_allow_or_fallthrough "chmod 7777 NOT caught (7 after 777)" \
+expect_allow "chmod 7777 (extra 7, deny rule chmod 777 doesn't match)" \
   "chmod 7777 file" "$SAFETY_ALLOW" "$SAFETY_DENY"
 
 # ---------------------------------------------------------------------------
-echo "=== Harmless wrapper commands (allow or fallthrough both OK) ==="
+echo "=== Harmless wrapper commands ==="
 
 BYPASS_DENY='["Bash(rm -rf /)", "Bash(rm -rf ~)", "Bash(chmod 777)"]'
 
-expect_allow_or_fallthrough "command -v rm (read-only)" \
+expect_fallthrough "command -v rm (command stripped, -v rm no match)" \
   "command -v rm" '["Bash(command *)"]' "$BYPASS_DENY"
-expect_allow_or_fallthrough "command --help (harmless)" \
+expect_fallthrough "command --help (command stripped, --help no match)" \
   "command --help" '["Bash(command *)"]' "$BYPASS_DENY"
 
 XARGS_DENY='["Bash(rm -rf /)", "Bash(rm -rf ~)", "Bash(chmod 777)"]'
-expect_allow_or_fallthrough "bare 'xargs' (defaults to echo)" \
+expect_allow "bare 'xargs' (xargs prefix matches)" \
   "xargs" '["Bash(xargs *)"]' "$XARGS_DENY"
 
 # ---------------------------------------------------------------------------
