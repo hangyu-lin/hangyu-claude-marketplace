@@ -23,7 +23,6 @@
       "Bash(git cherry-pick *)",
       "Bash(git reset *)",
       "Bash(git restore *)",
-      "Bash(git clean *)",
       "Bash(git remote *)",
       "Bash(git submodule *)",
       "Bash(git ls-files *)",

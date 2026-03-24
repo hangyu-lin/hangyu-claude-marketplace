@@ -108,7 +108,7 @@ ALL_ALLOW=$(jq -n '[
   "Bash(git rebase *)", "Bash(git pull *)", "Bash(git push *)",
   "Bash(git fetch *)", "Bash(git stash *)", "Bash(git show *)",
   "Bash(git blame *)", "Bash(git tag *)", "Bash(git cherry-pick *)",
-  "Bash(git reset *)", "Bash(git restore *)", "Bash(git clean *)",
+  "Bash(git reset *)", "Bash(git restore *)",
   "Bash(git remote *)", "Bash(git submodule *)", "Bash(git ls-files *)",
   "Bash(git ls-tree *)", "Bash(git rev-parse *)", "Bash(git config *)",
   "Bash(git clone *)", "Bash(git init *)",
