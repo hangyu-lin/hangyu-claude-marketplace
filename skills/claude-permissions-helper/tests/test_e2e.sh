@@ -8,50 +8,6 @@
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/test_helpers.sh"
 
-expect_allow() {
-  local name="$1" cmd="$2"
-  run_hook "$cmd" "$ALL_ALLOW" "$ALL_DENY"
-  local rc=$?
-  if [[ $rc -eq 0 ]] && jq -e '.hookSpecificOutput.permissionDecision == "allow"' <<< "$RESULT" &>/dev/null; then
-    pass "$name"
-  else
-    fail "$name" "exit=$rc output=$RESULT"
-  fi
-}
-
-expect_deny() {
-  local name="$1" cmd="$2"
-  run_hook "$cmd" "$ALL_ALLOW" "$ALL_DENY"
-  local rc=$?
-  if [[ $rc -eq 2 ]] || jq -e '.hookSpecificOutput.permissionDecision == "deny"' <<< "$RESULT" &>/dev/null; then
-    pass "$name"
-  else
-    fail "$name" "exit=$rc output=$RESULT"
-  fi
-}
-
-expect_fallthrough() {
-  local name="$1" cmd="$2"
-  run_hook "$cmd" "$ALL_ALLOW" "$ALL_DENY"
-  local rc=$?
-  if [[ $rc -eq 0 ]] && { [[ -z "$RESULT" ]] || ! jq -e '.hookSpecificOutput.permissionDecision' <<< "$RESULT" &>/dev/null; }; then
-    pass "$name"
-  else
-    fail "$name" "exit=$rc output=$RESULT"
-  fi
-}
-
-expect_not_approved() {
-  local name="$1" cmd="$2"
-  run_hook "$cmd" "$ALL_ALLOW" "$ALL_DENY"
-  local rc=$?
-  if [[ $rc -eq 0 ]] && jq -e '.hookSpecificOutput.permissionDecision == "allow"' <<< "$RESULT" &>/dev/null; then
-    fail "$name → AUTO-APPROVED" "should not be approved"
-  else
-    pass "$name"
-  fi
-}
-
 # ---------------------------------------------------------------------------
 # Build combined allow list from all Bash presets (excluding MCP/readonly)
 # ---------------------------------------------------------------------------

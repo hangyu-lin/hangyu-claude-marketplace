@@ -6,44 +6,6 @@
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/test_helpers.sh"
 
-is_fallthrough() {
-  [[ $1 -eq 0 ]] && { [[ -z "$RESULT" ]] || { jq -e '.systemMessage' <<< "$RESULT" &>/dev/null && ! jq -e '.hookSpecificOutput.permissionDecision' <<< "$RESULT" &>/dev/null; }; }
-}
-
-expect_deny() {
-  local name="$1" cmd="$2" perms="$3" deny="${4:-}"
-  run_hook "$cmd" "$perms" "$deny"
-  local rc=$?
-  if [[ $rc -eq 2 ]] || jq -e '.hookSpecificOutput.permissionDecision == "deny"' <<< "$RESULT" &>/dev/null; then
-    pass "$name"
-  else
-    fail "$name" "exit=$rc output=$RESULT"
-  fi
-}
-
-expect_fallthrough() {
-  local name="$1" cmd="$2" perms="$3" deny="${4:-}"
-  run_hook "$cmd" "$perms" "$deny"
-  local rc=$?
-  if is_fallthrough $rc; then
-    pass "$name"
-  else
-    fail "$name" "exit=$rc output=$RESULT"
-  fi
-}
-
-# Not auto-approved: deny OR fallthrough (either is safe)
-expect_not_approved() {
-  local name="$1" cmd="$2" perms="$3" deny="${4:-}"
-  run_hook "$cmd" "$perms" "$deny"
-  local rc=$?
-  if [[ $rc -eq 0 ]] && jq -e '.hookSpecificOutput.permissionDecision == "allow"' <<< "$RESULT" &>/dev/null; then
-    fail "$name" "AUTO-APPROVED (should not be)"
-  else
-    pass "$name"
-  fi
-}
-
 # ---------------------------------------------------------------------------
 echo "=== Simple commands ==="
 

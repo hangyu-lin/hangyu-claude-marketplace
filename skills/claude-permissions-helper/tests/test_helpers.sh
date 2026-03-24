@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Shared test helpers for claude-permissions-helper tests.
 # Source this file, don't execute it directly.
+#
+# All expect_* functions accept: (name, cmd) or (name, cmd, perms, deny).
+# When perms/deny are omitted, they fall back to ALL_ALLOW/ALL_DENY globals
+# (set these in your test file before calling expect_*).
 
 set -uo pipefail
 
@@ -31,4 +35,69 @@ print_results() {
   echo ""
   echo "Results: $PASS passed, $FAIL failed"
   [[ $FAIL -eq 0 ]] && exit 0 || exit 1
+}
+
+# ---------------------------------------------------------------------------
+# Assertion helpers
+# ---------------------------------------------------------------------------
+
+expect_allow() {
+  local name="$1" cmd="$2" perms="${3:-${ALL_ALLOW:-}}" deny="${4:-${ALL_DENY:-}}"
+  run_hook "$cmd" "$perms" "$deny"
+  local rc=$?
+  if [[ $rc -eq 0 ]] && jq -e '.hookSpecificOutput.permissionDecision == "allow"' <<< "$RESULT" &>/dev/null; then
+    pass "$name"
+  else
+    fail "$name" "exit=$rc output=$RESULT"
+  fi
+}
+
+expect_allow_or_fallthrough() {
+  local name="$1" cmd="$2" perms="${3:-${ALL_ALLOW:-}}" deny="${4:-${ALL_DENY:-}}"
+  run_hook "$cmd" "$perms" "$deny"
+  local rc=$?
+  if [[ $rc -eq 0 ]]; then
+    if jq -e '.hookSpecificOutput.permissionDecision == "allow"' <<< "$RESULT" &>/dev/null; then
+      pass "$name (auto-approved)"
+    elif [[ -z "$RESULT" ]] || ! jq -e '.hookSpecificOutput.permissionDecision' <<< "$RESULT" &>/dev/null; then
+      pass "$name (fallthrough, also OK)"
+    else
+      fail "$name" "exit=$rc output=$RESULT"
+    fi
+  else
+    fail "$name" "exit=$rc output=$RESULT"
+  fi
+}
+
+expect_deny() {
+  local name="$1" cmd="$2" perms="${3:-${ALL_ALLOW:-}}" deny="${4:-${ALL_DENY:-}}"
+  run_hook "$cmd" "$perms" "$deny"
+  local rc=$?
+  if [[ $rc -eq 2 ]] || jq -e '.hookSpecificOutput.permissionDecision == "deny"' <<< "$RESULT" &>/dev/null; then
+    pass "$name"
+  else
+    fail "$name" "exit=$rc output=$RESULT"
+  fi
+}
+
+expect_fallthrough() {
+  local name="$1" cmd="$2" perms="${3:-${ALL_ALLOW:-}}" deny="${4:-${ALL_DENY:-}}"
+  run_hook "$cmd" "$perms" "$deny"
+  local rc=$?
+  if [[ $rc -eq 0 ]] && { [[ -z "$RESULT" ]] || ! jq -e '.hookSpecificOutput.permissionDecision' <<< "$RESULT" &>/dev/null; }; then
+    pass "$name"
+  else
+    fail "$name" "exit=$rc output=$RESULT"
+  fi
+}
+
+expect_not_approved() {
+  local name="$1" cmd="$2" perms="${3:-${ALL_ALLOW:-}}" deny="${4:-${ALL_DENY:-}}"
+  run_hook "$cmd" "$perms" "$deny"
+  local rc=$?
+  if [[ $rc -eq 0 ]] && jq -e '.hookSpecificOutput.permissionDecision == "allow"' <<< "$RESULT" &>/dev/null; then
+    fail "$name → AUTO-APPROVED" "should not be approved"
+  else
+    pass "$name"
+  fi
 }

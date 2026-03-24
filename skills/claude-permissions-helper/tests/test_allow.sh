@@ -6,35 +6,6 @@
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/test_helpers.sh"
 
-expect_allow() {
-  local name="$1" cmd="$2" perms="$3" deny="${4:-}"
-  run_hook "$cmd" "$perms" "$deny"
-  local rc=$?
-  if [[ $rc -eq 0 ]] && jq -e '.hookSpecificOutput.permissionDecision == "allow"' <<< "$RESULT" &>/dev/null; then
-    pass "$name"
-  else
-    fail "$name" "exit=$rc output=$RESULT"
-  fi
-}
-
-# Also-OK helper: allow OR fallthrough are both acceptable
-expect_allow_or_fallthrough() {
-  local name="$1" cmd="$2" perms="$3" deny="${4:-}"
-  run_hook "$cmd" "$perms" "$deny"
-  local rc=$?
-  if [[ $rc -eq 0 ]]; then
-    if jq -e '.hookSpecificOutput.permissionDecision == "allow"' <<< "$RESULT" &>/dev/null; then
-      pass "$name (auto-approved)"
-    elif [[ -z "$RESULT" ]] || ! jq -e '.hookSpecificOutput.permissionDecision' <<< "$RESULT" &>/dev/null; then
-      pass "$name (fallthrough, also OK)"
-    else
-      fail "$name" "exit=$rc output=$RESULT"
-    fi
-  else
-    fail "$name" "exit=$rc output=$RESULT"
-  fi
-}
-
 # ---------------------------------------------------------------------------
 echo "=== Simple commands ==="
 
