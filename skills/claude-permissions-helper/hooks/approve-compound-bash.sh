@@ -490,6 +490,10 @@ main() {
   command=$(jq -r '.tool_input.command // empty' <<< "$input")
   [[ -z "$command" ]] && exit 0
 
+  # Normalize: replace \r with \n to prevent CR injection attacks where
+  # "git status\rrm -rf /" merges into a single token that matches "git status".
+  command="${command//$'\r'/$'\n'}"
+
   debug "Command: $command"
 
   # Load permissions (from settings files, or from --permissions/--deny for testing)
