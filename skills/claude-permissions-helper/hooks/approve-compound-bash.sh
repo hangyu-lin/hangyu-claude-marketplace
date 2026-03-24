@@ -245,6 +245,14 @@ parse_compound() {
       if ! parse_compound "$inner"; then
         printf '%s\0' "$entry"
       fi
+    # Recursively expand trap (first quoted arg is the command string)
+    # Skips trap -l, trap -p, trap '' SIG, trap - SIG (no .+ match)
+    elif [[ "$stripped_entry" =~ ^trap[[:space:]]+\'(.+)\'([[:space:]]|$) ]] ||
+         [[ "$stripped_entry" =~ ^trap[[:space:]]+\"(.+)\"([[:space:]]|$) ]]; then
+      debug "Recursing into trap: ${BASH_REMATCH[1]}"
+      if ! parse_compound "${BASH_REMATCH[1]}"; then
+        printf '%s\0' "$entry"
+      fi
     else
       printf '%s\0' "$entry"
     fi
@@ -364,6 +372,11 @@ strip_prefixes() {
         if [[ "$inner_cmd" =~ ^\'(.*)\'$ ]] || [[ "$inner_cmd" =~ ^\"(.*)\"$ ]]; then
           inner_cmd="${BASH_REMATCH[1]}"
         fi
+        [[ -n "$inner_cmd" ]] && extra+=("$inner_cmd")
+      # trap: first quoted arg is the command string
+      elif [[ "$cand" =~ ^trap[[:space:]]+\'(.+)\'([[:space:]]|$) ]] ||
+           [[ "$cand" =~ ^trap[[:space:]]+\"(.+)\"([[:space:]]|$) ]]; then
+        inner_cmd="${BASH_REMATCH[1]}"
         [[ -n "$inner_cmd" ]] && extra+=("$inner_cmd")
       # Simple prefix launchers: time, nohup, command, builtin
       elif [[ "$cand" =~ ^(time|nohup|command|builtin)[[:space:]]+(.+)$ ]]; then

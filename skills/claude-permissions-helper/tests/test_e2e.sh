@@ -82,9 +82,9 @@ ALL_ALLOW=$(jq -n '[
   "Bash(mkdir *)", "Bash(cd *)", "Bash(ls *)", "Bash(cat *)", "Bash(touch *)",
   "Bash(cp *)", "Bash(mv *)", "Bash(pwd *)", "Bash(echo *)", "Bash(test *)",
   "Bash(read *)", "Bash(break *)", "Bash(continue *)", "Bash(exit *)",
-  "Bash(return *)", "Bash(rev *)", "Bash(exec *)", "Bash(export *)",
+  "Bash(return *)", "Bash(rev *)", "Bash(export *)",
   "Bash(local *)", "Bash(declare *)", "Bash(unset *)", "Bash(set *)",
-  "Bash(shift *)", "Bash(trap *)", "Bash(printf *)", "Bash(grep *)",
+  "Bash(shift *)", "Bash(printf *)", "Bash(grep *)",
   "Bash(egrep *)", "Bash(fgrep *)", "Bash(find *)", "Bash(which *)",
   "Bash(whereis *)", "Bash(whoami *)", "Bash(date *)", "Bash(printenv *)",
   "Bash(head *)", "Bash(tail *)", "Bash(less *)", "Bash(more *)",
@@ -836,14 +836,21 @@ expect_deny "(rm -rf /) & (subshell + background)" \
 # ===========================================================================
 echo "=== ADVERSARIAL: trap injection ==="
 
-# trap IS in the core preset — auto-approves (trap args are opaque strings, not commands)
-expect_allow "trap 'rm -rf /' EXIT (trap in core preset, args opaque)" \
+# FIXED: trap removed from preset, hook now recurses into trap's command arg
+# trap 'rm -rf /' → inner rm -rf / extracted → denied
+expect_deny "trap 'rm -rf /' EXIT (trap recursion, inner denied)" \
   "trap 'rm -rf /' EXIT"
-# Compound: both git status and trap are in allow list
-expect_allow "git status; trap 'rm -rf /' EXIT (both in preset)" \
+# Compound: git status allowed, but trap with rm denied
+expect_deny "git status; trap 'rm -rf /' EXIT (compound, trap inner denied)" \
   "git status; trap 'rm -rf /' EXIT"
+# trap with safe inner command → approved via inner
+expect_allow "trap 'echo cleanup' EXIT (trap recursion, inner allowed)" \
+  "trap 'echo cleanup' EXIT"
+# trap '' INT (empty command = ignore signal) → fallthrough (trap not in preset)
+expect_not_approved "trap '' INT (empty cmd, trap not in preset)" \
+  "trap '' INT"
 # trap disabling signal then dangerous command
-expect_not_approved "trap '' INT; rm -rf / (trap + dangerous)" \
+expect_deny "trap '' INT; rm -rf / (trap + dangerous)" \
   "trap '' INT; rm -rf /"
 
 # ===========================================================================
