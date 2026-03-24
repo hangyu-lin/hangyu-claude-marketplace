@@ -11,7 +11,7 @@ This is a test skill to verify that the plugin marketplace is correctly installe
 
 When triggered, respond with:
 
-1. Confirm the plugin is loaded: "hello-world plugin from hangyu-claude-marketplace is active"
+1. Confirm the plugin is loaded: "hello-world plugin from deliveroo-claude-marketplace is active"
 2. Print the current working directory
 3. Print the current date and time
 4. Say something encouraging about testing plugins

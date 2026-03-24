@@ -30,7 +30,7 @@ This plugin provides:
 ## Install
 
 ```
-/install hangyu-lin/hangyu-claude-marketplace claude-permissions-helper
+/install deliveroo/deliveroo-claude-marketplace claude-permissions-helper
 ```
 
 The compound-bash hook activates immediately — no manual `settings.json` editing needed.

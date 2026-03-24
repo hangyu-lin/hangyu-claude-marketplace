@@ -1,11 +1,11 @@
 {
-  "name": "hangyu-claude-marketplace",
+  "name": "deliveroo-claude-marketplace",
   "owner": {
     "name": "Hangyu Lin",
     "email": "hangyu.lin@deliveroo.co.uk"
   },
   "metadata": {
-    "description": "Personal Claude Code plugin marketplace for testing plugin setups",
+    "description": "Deliveroo's Claude Code plugin marketplace",
     "version": "1.0.0"
   },
   "plugins": [

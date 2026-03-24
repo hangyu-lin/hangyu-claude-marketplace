@@ -1,13 +1,13 @@
-# hangyu-claude-marketplace
+# deliveroo-claude-marketplace
 
-Personal Claude Code plugin marketplace for testing plugin setups.
+Deliveroo's Claude Code plugin marketplace.
 
 ## Installation
 
 Add this marketplace to Claude Code:
 
 ```
-/plugin marketplace add hangyu-lin/hangyu-claude-marketplace
+/plugin marketplace add deliveroo/deliveroo-claude-marketplace
 ```
 
 ## Available Plugins
@@ -19,7 +19,7 @@ Add this marketplace to Claude Code:
 **Install:**
 
 ```
-/plugin install hello-world@hangyu-lin/hangyu-claude-marketplace
+/plugin install hello-world@deliveroo/deliveroo-claude-marketplace
 ```
 
 What you get:
@@ -29,7 +29,7 @@ What you get:
 
 | Team | Plugin | Description |
 |------|--------|-------------|
-| Menus | `/plugin install menus@hangyu-lin/hangyu-claude-marketplace` | Skills for the Menus team — see [teams/menus/README.md](teams/menus/README.md) |
+| Menus | `/plugin install menus@deliveroo/deliveroo-claude-marketplace` | Skills for the Menus team — see [teams/menus/README.md](teams/menus/README.md) |
 
 ## Contributing
 

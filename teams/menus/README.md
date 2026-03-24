@@ -5,7 +5,7 @@ Skills scoped to the Menus team (co-menus, menu page, menu search).
 ## Installation
 
 ```
-/plugin install menus@hangyu-lin/hangyu-claude-marketplace
+/plugin install menus@deliveroo/deliveroo-claude-marketplace
 ```
 
 ## Available Skills
